@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  ~ Copyright 2016-2020 Crown Copyright
+  ~ Copyright 2016-2024 Crown Copyright
   ~
   ~ Licensed under the Apache License, Version 2.0 (the "License");
   ~ you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@
     <parent>
         <groupId>uk.gov.gchq.gaffer</groupId>
         <artifactId>road-traffic</artifactId>
-        <version>1.20.1-SNAPSHOT</version>
+        <version>${revision}</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
 
@@ -115,51 +115,13 @@
         <dependency>
             <groupId>org.apache.accumulo</groupId>
             <artifactId>accumulo-minicluster</artifactId>
-            <version>${accumulo.version}</version>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.apache.hadoop</groupId>
             <artifactId>hadoop-hdfs</artifactId>
-            <version>${hadoop.version}</version>
             <scope>test</scope>
-            <!-- exclude server-side parts that conflict with running in a webapp -->
-            <exclusions>
-                <exclusion>
-                    <groupId>com.sun.jersey</groupId>
-                    <artifactId>jersey-grizzly2</artifactId>
-                </exclusion>
-                <exclusion>
-                    <groupId>com.sun.jersey</groupId>
-                    <artifactId>jersey-json</artifactId>
-                </exclusion>
-                <exclusion>
-                    <groupId>com.sun.jersey</groupId>
-                    <artifactId>jersey-server</artifactId>
-                </exclusion>
-                <exclusion>
-                    <groupId>com.sun.jersey</groupId>
-                    <artifactId>jersey-client</artifactId>
-                </exclusion>
-                <exclusion>
-                    <groupId>com.sun.jersey</groupId>
-                    <artifactId>jersey-core</artifactId>
-                </exclusion>
-                <exclusion>
-                    <groupId>javax.servlet</groupId>
-                    <artifactId>servlet-api</artifactId>
-                </exclusion>
-                <exclusion>
-                    <groupId>org.mortbay.jetty</groupId>
-                    <artifactId>jetty-util</artifactId>
-                </exclusion>
-                <exclusion>
-                    <groupId>org.apache.avro</groupId>
-                    <artifactId>avro-ipc</artifactId>
-                </exclusion>
-            </exclusions>
         </dependency>
-
     </dependencies>
 
     <build>
@@ -169,7 +131,6 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-war-plugin</artifactId>
-                <version>${maven-war-plugin.version}</version>
                 <configuration>
                     <attachClasses>true</attachClasses>
                     <classesClassifier>classes</classesClassifier>
@@ -178,19 +139,20 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-dependency-plugin</artifactId>
-                <version>2.10</version>
                 <dependencies>
                     <dependency>
                         <groupId>uk.gov.gchq.gaffer</groupId>
                         <artifactId>${store.type}-rest</artifactId>
                         <version>${project.parent.version}</version>
                         <type>war</type>
+                        <classifier>${war.classifier}</classifier>
                     </dependency>
                 </dependencies>
                 <executions>
                     <execution>
+                        <?m2e ignore?>
                         <id>unpack</id>
-                        <phase>compile</phase>
+                        <phase>prepare-package</phase>
                         <goals>
                             <goal>unpack</goal>
                         </goals>
@@ -201,6 +163,7 @@
                                     <artifactId>${store.type}-rest</artifactId>
                                     <version>${project.parent.version}</version>
                                     <type>war</type>
+                                    <classifier>${war.classifier}</classifier>
                                     <overWrite>false</overWrite>
                                     <outputDirectory>
                                         ${project.build.directory}/${project.artifactId}-${project.version}
@@ -238,7 +201,6 @@
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-failsafe-plugin</artifactId>
-                        <version>${failsafe.version}</version>
                         <executions>
                             <execution>
                                 <id>system-test</id>

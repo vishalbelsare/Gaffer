@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 Crown Copyright
+ * Copyright 2017-2024 Crown Copyright
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,11 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package uk.gov.gchq.gaffer.mapstore.impl;
 
 import org.junit.jupiter.api.Test;
 
-import uk.gov.gchq.gaffer.commonutil.iterable.CloseableIterable;
 import uk.gov.gchq.gaffer.commonutil.stream.Streams;
 import uk.gov.gchq.gaffer.data.element.Edge;
 import uk.gov.gchq.gaffer.data.element.function.ElementFilter;
@@ -33,19 +33,17 @@ import uk.gov.gchq.gaffer.user.User;
 import uk.gov.gchq.koryphe.impl.predicate.IsEqual;
 import uk.gov.gchq.koryphe.impl.predicate.IsMoreThan;
 
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 
-import static junit.framework.TestCase.assertTrue;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.fail;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 import static uk.gov.gchq.gaffer.mapstore.impl.VisibilityTest.VERTEX_1;
 
-public class GetAdjacentIdsTest {
+class GetAdjacentIdsTest {
 
     @Test
-    public void shouldGetAdjacentIdsWhenThereAreNone() throws OperationException {
+    void shouldGetAdjacentIdsWhenThereAreNone() throws OperationException {
         // Given
         final Graph graph = GetAllElementsHandlerTest.getGraph();
         final AddElements addElements = new AddElements.Builder()
@@ -57,16 +55,16 @@ public class GetAdjacentIdsTest {
         final GetAdjacentIds getAdjacentIds = new GetAdjacentIds.Builder()
                 .input(new EntitySeed("NOT_PRESENT"))
                 .build();
-        final CloseableIterable<? extends EntityId> results = graph.execute(getAdjacentIds, new User());
+        final Iterable<? extends EntityId> results = graph.execute(getAdjacentIds, new User());
 
         // Then
         final Set<EntityId> resultsSet = new HashSet<>();
         Streams.toStream(results).forEach(resultsSet::add);
-        assertEquals(Collections.emptySet(), resultsSet);
+        assertThat(resultsSet).isEmpty();
     }
 
     @Test
-    public void shouldGetAdjacentEntityId() throws OperationException {
+    void shouldGetAdjacentEntityId() throws OperationException {
         // Given
         final Graph graph = GetAllElementsHandlerTest.getGraph();
         final AddElements addElements = new AddElements.Builder()
@@ -78,7 +76,7 @@ public class GetAdjacentIdsTest {
         GetAdjacentIds getAdjacentIds = new GetAdjacentIds.Builder()
                 .input(new EntitySeed("A"))
                 .build();
-        CloseableIterable<? extends EntityId> results = graph.execute(getAdjacentIds, new User());
+        Iterable<? extends EntityId> results = graph.execute(getAdjacentIds, new User());
 
         // Then
         final Set<EntityId> resultsSet = new HashSet<>();
@@ -103,12 +101,12 @@ public class GetAdjacentIdsTest {
                 .flatMap(nodes -> nodes.stream())
                 .forEach(expectedResults::add);
         expectedResults.remove(new EntitySeed("A"));
-        assertEquals(expectedResults, resultsSet);
+        assertThat(resultsSet).isEqualTo(expectedResults);
 
         // Repeat to ensure iterator can be consumed twice
         resultsSet.clear();
         Streams.toStream(results).forEach(resultsSet::add);
-        assertEquals(expectedResults, resultsSet);
+        assertThat(resultsSet).isEqualTo(expectedResults);
 
         // When - query for A and Y2
         getAdjacentIds = new GetAdjacentIds.Builder()
@@ -138,11 +136,11 @@ public class GetAdjacentIdsTest {
                 .forEach(expectedResults::add);
         expectedResults.remove(new EntitySeed("A"));
         expectedResults.remove(new EntitySeed("Y2"));
-        assertEquals(expectedResults, resultsSet);
+        assertThat(resultsSet).isEqualTo(expectedResults);
     }
 
     @Test
-    public void shouldGetAdjacentEntityIdWithViewRestrictedByGroup() throws OperationException {
+    void shouldGetAdjacentEntityIdWithViewRestrictedByGroup() throws OperationException {
         // Given
         final Graph graph = GetAllElementsHandlerTest.getGraph();
         final AddElements addElements = new AddElements.Builder()
@@ -157,7 +155,7 @@ public class GetAdjacentIdsTest {
                         .edge(GetAllElementsHandlerTest.BASIC_EDGE2)
                         .build())
                 .build();
-        final CloseableIterable<? extends EntityId> results = graph.execute(getAdjacentIds, new User());
+        final Iterable<? extends EntityId> results = graph.execute(getAdjacentIds, new User());
 
         // Then
         final Set<EntityId> resultsSet = new HashSet<>();
@@ -182,11 +180,12 @@ public class GetAdjacentIdsTest {
                 .forEach(expectedResults::add);
         expectedResults.remove(new EntitySeed("A"));
         expectedResults.remove(new EntitySeed("Y2"));
-        assertEquals(expectedResults, resultsSet);
+        assertThat(resultsSet).isEqualTo(expectedResults);
     }
 
     @Test
-    public void shouldGetElementsByEntityIdWithViewRestrictedByGroupAndAPreAggregationFilter() throws OperationException {
+    void shouldGetElementsByEntityIdWithViewRestrictedByGroupAndAPreAggregationFilter()
+            throws OperationException {
         // Given
         final Graph graph = GetAllElementsHandlerTest.getGraph();
         final AddElements addElements = new AddElements.Builder()
@@ -206,7 +205,7 @@ public class GetAdjacentIdsTest {
                                 .build())
                         .build())
                 .build();
-        final CloseableIterable<? extends EntityId> results = graph.execute(getAdjacentIds, new User());
+        final Iterable<? extends EntityId> results = graph.execute(getAdjacentIds, new User());
 
         // Then
         final Set<EntityId> resultsSet = new HashSet<>();
@@ -232,11 +231,12 @@ public class GetAdjacentIdsTest {
                 .forEach(expectedResults::add);
         expectedResults.remove(new EntitySeed("A"));
         expectedResults.remove(new EntitySeed("Y2"));
-        assertEquals(expectedResults, resultsSet);
+        assertThat(resultsSet).isEqualTo(expectedResults);
     }
 
     @Test
-    public void shouldGetElementsByEntityIdWithViewRestrictedByGroupAndAPostAggregationFilter() throws OperationException {
+    void shouldGetElementsByEntityIdWithViewRestrictedByGroupAndAPostAggregationFilter()
+            throws OperationException {
         // Given
         final Graph graph = GetAllElementsHandlerTest.getGraph();
         final AddElements addElements = new AddElements.Builder()
@@ -256,7 +256,7 @@ public class GetAdjacentIdsTest {
                                 .build())
                         .build())
                 .build();
-        final CloseableIterable<? extends EntityId> results = graph.execute(getAdjacentIds, new User());
+        final Iterable<? extends EntityId> results = graph.execute(getAdjacentIds, new User());
 
         // Then
         final Set<EntityId> resultsSet = new HashSet<>();
@@ -282,11 +282,11 @@ public class GetAdjacentIdsTest {
                 .forEach(expectedResults::add);
         expectedResults.remove(new EntitySeed("A"));
         expectedResults.remove(new EntitySeed("Y2"));
-        assertEquals(expectedResults, resultsSet);
+        assertThat(resultsSet).isEqualTo(expectedResults);
     }
 
     @Test
-    public void shouldFailValidationWhenEntityHasFilter() throws OperationException {
+    void shouldFailValidationWhenEntityHasFilter() throws OperationException {
         // Given
         final Graph graph = GetAllElementsHandlerTest.getGraph();
         final AddElements addElements = new AddElements.Builder()
@@ -295,33 +295,29 @@ public class GetAdjacentIdsTest {
         graph.execute(addElements, new User());
 
         // When / Then
-        try {
-            final GetAdjacentIds getAdjacentIds = new GetAdjacentIds.Builder()
-                    .input(new EntitySeed("A"), new EntitySeed("Y2"))
-                    .view(new View.Builder()
-                                  .edge(GetAllElementsHandlerTest.BASIC_EDGE1, new ViewElementDefinition.Builder()
-                                          .postAggregationFilter(new ElementFilter.Builder()
-                                                                         .select(GetAllElementsHandlerTest.COUNT)
-                                                                         .execute(new IsMoreThan(5))
-                                                                         .build())
-                                          .build())
-                          .entity(GetAllElementsHandlerTest.BASIC_ENTITY, new ViewElementDefinition.Builder()
-                                  .postAggregationFilter(new ElementFilter.Builder()
-                                                        .select(GetAllElementsHandlerTest.PROPERTY1)
-                                                        .execute(new IsEqual("string"))
-                                                        .build())
-                                  .build())
-                          .build())
-                    .build();
-            final CloseableIterable<? extends EntityId> results = graph.execute(getAdjacentIds, new User());
-            fail("Exception expected");
-        } catch (IllegalArgumentException e) {
-            assertTrue(e.getMessage().contains("View should not have entities with filters."));
-        }
+        assertThatIllegalArgumentException()
+                .isThrownBy(() -> new GetAdjacentIds.Builder()
+                        .input(new EntitySeed("A"), new EntitySeed("Y2"))
+                        .view(new View.Builder()
+                                .edge(GetAllElementsHandlerTest.BASIC_EDGE1, new ViewElementDefinition.Builder()
+                                        .postAggregationFilter(new ElementFilter.Builder()
+                                                .select(GetAllElementsHandlerTest.COUNT)
+                                                .execute(new IsMoreThan(5))
+                                                .build())
+                                        .build())
+                                .entity(GetAllElementsHandlerTest.BASIC_ENTITY, new ViewElementDefinition.Builder()
+                                        .postAggregationFilter(new ElementFilter.Builder()
+                                                .select(GetAllElementsHandlerTest.PROPERTY1)
+                                                .execute(new IsEqual("string"))
+                                                .build())
+                                        .build())
+                                .build())
+                        .build())
+                .withMessageContaining("View should not have entities with filters.");
     }
 
     @Test
-    public void shouldPassValidationOnEntitiesWithoutFilters() throws OperationException {
+    void shouldPassValidationOnEntitiesWithoutFilters() throws OperationException {
         // Given
         final Graph graph = GetAllElementsHandlerTest.getGraph();
         final AddElements addElements = new AddElements.Builder()
@@ -333,17 +329,17 @@ public class GetAdjacentIdsTest {
         final GetAdjacentIds getAdjacentIds = new GetAdjacentIds.Builder()
                 .input(new EntitySeed("A"), new EntitySeed("Y2"))
                 .view(new View.Builder()
-                      .edge(GetAllElementsHandlerTest.BASIC_EDGE1, new ViewElementDefinition.Builder()
-                            .postAggregationFilter(new ElementFilter.Builder()
-                                                   .select(GetAllElementsHandlerTest.COUNT)
-                                                   .execute(new IsMoreThan(5))
-                                                   .build())
-                            .build())
-                      .entity(GetAllElementsHandlerTest.BASIC_ENTITY, new ViewElementDefinition())
-                      .build())
+                        .edge(GetAllElementsHandlerTest.BASIC_EDGE1, new ViewElementDefinition.Builder()
+                                .postAggregationFilter(new ElementFilter.Builder()
+                                        .select(GetAllElementsHandlerTest.COUNT)
+                                        .execute(new IsMoreThan(5))
+                                        .build())
+                                .build())
+                        .entity(GetAllElementsHandlerTest.BASIC_ENTITY, new ViewElementDefinition())
+                        .build())
                 .build();
 
-        final CloseableIterable<? extends EntityId> results = graph.execute(getAdjacentIds, new User());
+        final Iterable<? extends EntityId> results = graph.execute(getAdjacentIds, new User());
 
         // Then
         final Set<EntityId> resultsSet = new HashSet<>();
@@ -369,15 +365,12 @@ public class GetAdjacentIdsTest {
                 .forEach(expectedResults::add);
         expectedResults.remove(new EntitySeed("A"));
         expectedResults.remove(new EntitySeed("Y2"));
-        assertEquals(expectedResults, resultsSet);
+        assertThat(resultsSet).isEqualTo(expectedResults);
     }
 
     @Test
-    public void shouldApplyVisibilityTraitToOperationResults() throws OperationException {
-        VisibilityTest.executeOperation(
-                new GetAdjacentIds.Builder()
-                        .input(new EntitySeed(VERTEX_1))
-                        .build(),
+    void shouldApplyVisibilityTraitToOperationResults() throws OperationException {
+        VisibilityTest.executeOperation(new GetAdjacentIds.Builder().input(new EntitySeed(VERTEX_1)).build(),
                 VisibilityTest::vertex1AdjacentIdsResultConsumer);
     }
 }

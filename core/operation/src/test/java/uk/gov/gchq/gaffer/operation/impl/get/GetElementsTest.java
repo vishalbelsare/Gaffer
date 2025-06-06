@@ -1,5 +1,5 @@
 /*
- * Copyright 2016-2021 Crown Copyright
+ * Copyright 2016-2023 Crown Copyright
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,10 +16,9 @@
 
 package uk.gov.gchq.gaffer.operation.impl.get;
 
-import com.google.common.collect.Lists;
+import org.assertj.core.api.InstanceOfAssertFactories;
 import org.junit.jupiter.api.Test;
 
-import uk.gov.gchq.gaffer.commonutil.iterable.CloseableIterable;
 import uk.gov.gchq.gaffer.data.element.Edge;
 import uk.gov.gchq.gaffer.data.element.Entity;
 import uk.gov.gchq.gaffer.data.element.id.DirectedType;
@@ -28,7 +27,6 @@ import uk.gov.gchq.gaffer.data.elementdefinition.view.View;
 import uk.gov.gchq.gaffer.exception.SerialisationException;
 import uk.gov.gchq.gaffer.jsonserialisation.JSONSerialiser;
 import uk.gov.gchq.gaffer.operation.OperationTest;
-import uk.gov.gchq.gaffer.operation.SeedMatching.SeedMatchingType;
 import uk.gov.gchq.gaffer.operation.data.EdgeSeed;
 import uk.gov.gchq.gaffer.operation.data.ElementSeed;
 import uk.gov.gchq.gaffer.operation.data.EntitySeed;
@@ -38,35 +36,50 @@ import uk.gov.gchq.gaffer.types.TypeSubTypeValue;
 
 import java.util.Iterator;
 
-import static junit.framework.TestCase.assertNotNull;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotSame;
 
 public class GetElementsTest extends OperationTest<GetElements> {
 
+    // This demonstrates how to do the equivalent of seedMatching EQUALS
     @Test
-    public void shouldSetSeedMatchingTypeToEquals() {
+    public void shouldSetViewToCorrectGroup() {
         // Given
         final ElementId elementId1 = new EntitySeed("identifier");
 
         // When
         final GetElements op = new GetElements.Builder()
                 .input(elementId1)
-                .seedMatching(SeedMatchingType.EQUAL)
+                .view(new View.Builder()
+                        .entity("group1")
+                        .build())
                 .build();
 
         // Then
-        assertEquals(SeedMatchingType.EQUAL, op.getSeedMatching());
+        assertThat(op.getView().getGroups()).contains("group1");
+    }
+
+    // This demonstrates how to do the equivalent of seedMatching RELATED
+    @Test
+    public void shouldHaveNoViewSet() {
+        final ElementId elementId1 = new EntitySeed("identifier");
+        final ElementId elementId2 = new EdgeSeed("source2", "destination2", true);
+
+        // When
+        final GetElements op = new GetElements.Builder()
+                .input(elementId1, elementId2)
+                .build();
+
+        // Then
+        assertThat(op.getView()).isNull();
     }
 
     @Test
     public void shouldGetOutputClass() {
         // When
-        final Class<?> outputClass = new GetElements().getOutputClass();
+        final Class<?> outputClass = getTestObject().getOutputClass();
 
         // Then
-        assertEquals(CloseableIterable.class, outputClass);
+        assertThat(outputClass).isEqualTo(Iterable.class);
     }
 
     @Test
@@ -79,11 +92,11 @@ public class GetElementsTest extends OperationTest<GetElements> {
                 .build();
 
         // When
-        byte[] json = JSONSerialiser.serialise(op, true);
+        final byte[] json = JSONSerialiser.serialise(op, true);
         final GetElements deserialisedOp = JSONSerialiser.deserialise(json, GetElements.class);
 
         // Then
-        final Iterator itr = deserialisedOp.getInput().iterator();
+        final Iterator<?> itr = deserialisedOp.getInput().iterator();
         assertThat(itr.next()).isEqualTo(elementSeed1);
         assertThat(itr.next()).isEqualTo(elementSeed2);
         assertThat(itr).isExhausted();
@@ -103,10 +116,8 @@ public class GetElementsTest extends OperationTest<GetElements> {
         final GetElements deserialisedOp = JSONSerialiser.deserialise(json, GetElements.class);
 
         // Then
-        assertEquals(
-                Lists.newArrayList(new EntitySeed(1), new EntitySeed(new TypeSubTypeValue("t", "s", "v")), new EntitySeed(2L)),
-                Lists.newArrayList(deserialisedOp.getInput())
-        );
+        assertThat((Iterable<ElementId>) deserialisedOp.getInput())
+                .containsExactly(new EntitySeed(1), new EntitySeed(new TypeSubTypeValue("t", "s", "v")), new EntitySeed(2L));
     }
 
     @Test
@@ -123,10 +134,8 @@ public class GetElementsTest extends OperationTest<GetElements> {
         final GetElements deserialisedOp = JSONSerialiser.deserialise(json, GetElements.class);
 
         // Then
-        assertEquals(
-                Lists.newArrayList(new EntitySeed(1), new EntitySeed(new TypeSubTypeValue("t", "s", "v")), new EntitySeed(2L)),
-                Lists.newArrayList(deserialisedOp.getInput())
-        );
+        assertThat((Iterable<ElementId>) deserialisedOp.getInput())
+                .containsExactly(new EntitySeed(1), new EntitySeed(new TypeSubTypeValue("t", "s", "v")), new EntitySeed(2L));
     }
 
     private void builderShouldCreatePopulatedOperationAll() {
@@ -138,39 +147,23 @@ public class GetElementsTest extends OperationTest<GetElements> {
                         .build())
                 .build();
 
-        assertEquals(SeededGraphFilters.IncludeIncomingOutgoingType.EITHER,
-                op.getIncludeIncomingOutGoing());
-        assertNotNull(op.getView());
-        assertEquals(Lists.newArrayList(new EntitySeed("A"), new EntitySeed(1), new EdgeSeed(2L, 3L)), Lists.newArrayList(op.getInput()));
-    }
-
-    @Test
-    public void shouldSetSeedMatchingTypeToRelated() {
-        final ElementId elementId1 = new EntitySeed("identifier");
-        final ElementId elementId2 = new EdgeSeed("source2", "destination2", true);
-
-        // When
-        final GetElements op = new GetElements.Builder()
-                .input(elementId1, elementId2)
-                .seedMatching(SeedMatchingType.RELATED)
-                .build();
-
-        // Then
-        assertEquals(SeedMatchingType.RELATED, op.getSeedMatching());
+        assertThat(op.getIncludeIncomingOutGoing()).isEqualTo(SeededGraphFilters.IncludeIncomingOutgoingType.EITHER);
+        assertThat(op.getView()).isNotNull();
+        assertThat((Iterable<ElementId>) op.getInput())
+                .containsExactly(new EntitySeed("A"), new EntitySeed(1), new EdgeSeed(2L, 3L));
     }
 
     private void builderShouldCreatePopulatedOperationIncoming() {
-        ElementSeed seed = new EntitySeed("A");
-        GetElements op = new GetElements.Builder()
+        final ElementSeed seed = new EntitySeed("A");
+        final GetElements op = new GetElements.Builder()
                 .input(seed)
                 .inOutType(SeededGraphFilters.IncludeIncomingOutgoingType.INCOMING)
                 .view(new View.Builder()
                         .edge("testEdgeGroup")
                         .build())
                 .build();
-        assertEquals(SeededGraphFilters.IncludeIncomingOutgoingType.INCOMING,
-                op.getIncludeIncomingOutGoing());
-        assertNotNull(op.getView());
+        assertThat(op.getIncludeIncomingOutGoing()).isEqualTo(SeededGraphFilters.IncludeIncomingOutgoingType.INCOMING);
+        assertThat(op.getView()).isNotNull();
         assertThat(op.getInput().iterator().next()).isEqualTo(seed);
     }
 
@@ -183,7 +176,7 @@ public class GetElementsTest extends OperationTest<GetElements> {
                 .build();
 
         // Then
-        assertEquals(DirectedType.EITHER, op.getDirectedType());
+        assertThat(op.getDirectedType()).isEqualTo(DirectedType.EITHER);
     }
 
     @Test
@@ -195,7 +188,8 @@ public class GetElementsTest extends OperationTest<GetElements> {
                 .build();
 
         // Then
-        assertThat(op.getOptions()).isNotNull()
+        assertThat(op.getOptions())
+                .isNotNull()
                 .containsEntry("key", "value");
     }
 
@@ -210,8 +204,8 @@ public class GetElementsTest extends OperationTest<GetElements> {
     @Override
     public void shouldShallowCloneOperation() {
         // Given
-        EntitySeed input = new EntitySeed("A");
-        View view = new View.Builder()
+        final EntitySeed input = new EntitySeed("A");
+        final View view = new View.Builder()
                 .edge("testEdgeGroup")
                 .build();
         final GetElements getElements = new GetElements.Builder()
@@ -219,21 +213,19 @@ public class GetElementsTest extends OperationTest<GetElements> {
                 .inOutType(IncludeIncomingOutgoingType.EITHER)
                 .view(view)
                 .directedType(DirectedType.DIRECTED)
-                .seedMatching(SeedMatchingType.RELATED)
                 .option("testOption", "true")
                 .build();
 
         // When
-        GetElements clone = getElements.shallowClone();
+        final GetElements clone = getElements.shallowClone();
 
         // Then
-        assertNotSame(getElements, clone);
-        assertEquals(Lists.newArrayList(input), Lists.newArrayList(clone.getInput()));
-        assertEquals(IncludeIncomingOutgoingType.EITHER, clone.getIncludeIncomingOutGoing());
-        assertEquals(view, clone.getView());
-        assertEquals(DirectedType.DIRECTED, clone.getDirectedType());
-        assertEquals(SeedMatchingType.RELATED, clone.getSeedMatching());
-        assertEquals("true", clone.getOption("testOption"));
+        assertThat(clone).isNotSameAs(getElements);
+        assertThat(clone.getInput()).asInstanceOf(InstanceOfAssertFactories.iterable(EntitySeed.class)).containsExactly(input);
+        assertThat(clone.getIncludeIncomingOutGoing()).isEqualTo(IncludeIncomingOutgoingType.EITHER);
+        assertThat(clone.getView()).isEqualTo(view);
+        assertThat(clone.getDirectedType()).isEqualTo(DirectedType.DIRECTED);
+        assertThat(clone.getOption("testOption")).isEqualTo("true");
     }
 
     @Test
@@ -244,10 +236,9 @@ public class GetElementsTest extends OperationTest<GetElements> {
                 .build();
 
         // Then
-        assertEquals(
-                Lists.newArrayList(new EntitySeed("1"), new EntitySeed("2"), new Entity("group1", "3"), new EdgeSeed("4", "5"), new Edge("group", "6", "7", true)),
-                Lists.newArrayList(op.getInput())
-        );
+        assertThat((Iterable<ElementId>) op.getInput())
+                .containsExactly(new EntitySeed("1"), new EntitySeed("2"), new Entity("group1", "3"), new EdgeSeed("4", "5"),
+                        new Edge("group", "6", "7", true));
     }
 
     @Override

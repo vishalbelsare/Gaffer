@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 Crown Copyright
+ * Copyright 2017-2025 Crown Copyright
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -41,6 +41,7 @@ import uk.gov.gchq.koryphe.Summary;
 import uk.gov.gchq.koryphe.ValidationResult;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Predicate;
@@ -56,6 +57,7 @@ import java.util.stream.Collectors;
  * one operation providing the input {@link EntityId}s for the next.
  */
 @JsonPropertyOrder(value = {"class", "input", "operations", "includePartial", "conditional"}, alphabetic = true)
+@JsonInclude(JsonInclude.Include.NON_DEFAULT)
 @Since("1.1.0")
 @Summary("Walks around the Graph, returning the full walks taken")
 public class GetWalks implements
@@ -66,10 +68,9 @@ public class GetWalks implements
     public static final String HOP_DEFINITION = "A hop is a GetElements operation that selects at least 1 edge group.";
     public static final int DEFAULT_RESULTS_LIMIT = 1000000;
 
-    private List<OperationChain<Iterable<Element>>> operations = new ArrayList<>();
+    private final List<OperationChain<Iterable<Element>>> operations = new ArrayList<>();
     private Iterable<? extends EntityId> input;
 
-    @JsonInclude(JsonInclude.Include.NON_DEFAULT)
     private boolean includePartial = false;
 
     /**
@@ -153,6 +154,11 @@ public class GetWalks implements
         return result;
     }
 
+    @Override
+    public List<Operation> flatten() {
+        return Arrays.asList(this);
+    }
+
     @JsonIgnore
     public int getNumberOfGetEdgeOperations() {
         return getNumberOfGetEdgeOperations(operations);
@@ -166,7 +172,7 @@ public class GetWalks implements
             hops += getNumberOfGetEdgeOperations(((Operations<?>) op).getOperations());
         } else if (op instanceof GetElements) {
             final GetElements getElements = (GetElements) op;
-            if (null != getElements.getView() && getElements.getView().hasEdges()) {
+            if (null != getElements.getView() && (getElements.getView().hasEdges() || getElements.getView().isAllEdges())) {
                 hops += 1;
             }
         }
@@ -187,7 +193,7 @@ public class GetWalks implements
             hops += getNumberOfGetEdgeOperationsWithoutRepeats(((Operations<?>) op).getOperations());
         } else if (op instanceof GetElements) {
             final GetElements getElements = (GetElements) op;
-            if (null != getElements.getView() && getElements.getView().hasEdges()) {
+            if (null != getElements.getView() && (getElements.getView().hasEdges() || getElements.getView().isAllEdges())) {
                 hops += 1;
             }
         }
@@ -265,18 +271,6 @@ public class GetWalks implements
                 _getOp().setOperations(operations);
             }
             return _self();
-        }
-
-        /**
-         * Adds an operation.
-         *
-         * @param operation the operation to add
-         * @return the Builder
-         * @deprecated use addOperations instead
-         */
-        @Deprecated
-        public Builder operation(final Output operation) {
-            return addOperations(operation);
         }
 
         public Builder addOperations(final Output... operations) {

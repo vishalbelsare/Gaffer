@@ -1,5 +1,5 @@
 /*
- * Copyright 2016-2020 Crown Copyright
+ * Copyright 2016-2023 Crown Copyright
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -39,6 +39,9 @@ import java.util.List;
 import java.util.function.BinaryOperator;
 import java.util.function.Predicate;
 
+import static uk.gov.gchq.gaffer.store.schema.Schema.FORMAT_EXCEPTION;
+import static uk.gov.gchq.gaffer.store.schema.Schema.FORMAT_UNABLE_TO_MERGE_SCHEMAS_CONFLICT_WITH_S;
+
 /**
  * A {@code TypeDefinition} contains the an object's java class along with how to validate and aggregate the object.
  * It is used to deserialise/serialise a {@link Schema} to/from JSON.
@@ -49,6 +52,13 @@ import java.util.function.Predicate;
 }, alphabetic = true)
 @JsonFilter(JSONSerialiser.FILTER_FIELDS_BY_NAME)
 public class TypeDefinition {
+
+    public static final String TYPE_CLASS = "type class";
+    public static final String SCHEMAS_CONFLICT_WITH_TYPE_CLASS = String.format(FORMAT_UNABLE_TO_MERGE_SCHEMAS_CONFLICT_WITH_S, TYPE_CLASS);
+    public static final String TYPE_SERIALISER = "type serialiser";
+    public static final String SCHEMAS_CONFLICT_WITH_TYPE_SERIALISER = String.format(FORMAT_UNABLE_TO_MERGE_SCHEMAS_CONFLICT_WITH_S, TYPE_SERIALISER);
+    public static final String AGGREGATE_FUNCTION = "aggregate function";
+    public static final String SCHEMAS_CONFLICT_WITH_AGGREGATE_FUNCTION = String.format(FORMAT_UNABLE_TO_MERGE_SCHEMAS_CONFLICT_WITH_S, AGGREGATE_FUNCTION);
     private Class<?> clazz;
     private Serialiser serialiser;
     private List<Predicate> validateFunctions;
@@ -110,35 +120,6 @@ public class TypeDefinition {
         this.serialiser = serialiser;
     }
 
-    @JsonIgnore
-    public String getSerialiserClass() {
-        if (null == serialiser) {
-            return null;
-        }
-
-        return SimpleClassNameIdResolver.getSimpleClassName(serialiser.getClass());
-    }
-
-    @Deprecated
-    @JsonSetter("serialiserClass")
-    public void setSerialiserClass(final String clazz) {
-        if (null == clazz) {
-            this.serialiser = null;
-        } else {
-            final Class<? extends Serialiser> serialiserClass;
-            try {
-                serialiserClass = Class.forName(SimpleClassNameIdResolver.getClassName(clazz)).asSubclass(Serialiser.class);
-            } catch (final ClassNotFoundException e) {
-                throw new SchemaException(e.getMessage(), e);
-            }
-            try {
-                this.serialiser = serialiserClass.newInstance();
-            } catch (final IllegalAccessException | IllegalArgumentException | SecurityException | InstantiationException e) {
-                throw new SchemaException(e.getMessage(), e);
-            }
-        }
-    }
-
     @JsonTypeInfo(use = JsonTypeInfo.Id.CLASS, include = JsonTypeInfo.As.PROPERTY, property = "class")
     public BinaryOperator getAggregateFunction() {
         return aggregateFunction;
@@ -160,16 +141,14 @@ public class TypeDefinition {
         if (null == clazz) {
             clazz = type.getClazz();
         } else if (null != type.getClazz() && !clazz.equals(type.getClazz())) {
-            throw new SchemaException("Unable to merge schemas. Conflict with type class, options are: "
-                    + clazz.getName() + " and " + type.getClazz().getName());
+            throw new SchemaException(String.format(FORMAT_EXCEPTION, SCHEMAS_CONFLICT_WITH_TYPE_CLASS, clazz.getName(), type.getClazz().getName()));
         }
 
         if (null != type.getSerialiser()) {
             if (null == getSerialiser()) {
                 setSerialiser(type.getSerialiser());
             } else if (!getSerialiser().getClass().equals(type.getSerialiser().getClass())) {
-                throw new SchemaException("Unable to merge schemas. Conflict with type (" + clazz + ") serialiser, options are: "
-                        + getSerialiser().getClass().getName() + " and " + type.getSerialiser().getClass().getName());
+                throw new SchemaException(String.format(FORMAT_EXCEPTION, SCHEMAS_CONFLICT_WITH_TYPE_SERIALISER, getSerialiser().getClass().getName(), type.getSerialiser().getClass().getName()));
             }
         }
 
@@ -188,8 +167,7 @@ public class TypeDefinition {
         if (null == aggregateFunction) {
             aggregateFunction = type.getAggregateFunction();
         } else if (null != type.getAggregateFunction() && !aggregateFunction.equals(type.getAggregateFunction())) {
-            throw new SchemaException("Unable to merge schemas. Conflict with type (" + clazz + ") aggregate function, options are: "
-                    + aggregateFunction + " and " + type.getAggregateFunction());
+            throw new SchemaException(String.format(FORMAT_EXCEPTION, SCHEMAS_CONFLICT_WITH_AGGREGATE_FUNCTION, aggregateFunction, type.getAggregateFunction()));
         }
 
         if (null == description) {

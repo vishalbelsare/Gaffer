@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2021 Crown Copyright
+ * Copyright 2020-2024 Crown Copyright
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,7 +26,7 @@ import org.springframework.mock.env.MockPropertySource;
 import uk.gov.gchq.gaffer.rest.factory.DefaultGraphFactory;
 import uk.gov.gchq.gaffer.rest.factory.MockGraphFactory;
 import uk.gov.gchq.gaffer.rest.factory.MockUserFactory;
-import uk.gov.gchq.gaffer.rest.factory.UnknownUserFactory;
+import uk.gov.gchq.gaffer.rest.factory.spring.UnknownUserFactory;
 
 import java.util.Properties;
 
@@ -107,7 +107,7 @@ public class FactoryConfigTest {
         propertySources.addFirst(mockPropertySource);
 
         when(mockEnv.getPropertySources()).thenReturn(propertySources);
-        when(mockEnv.getProperty(GRAPH_FACTORY_CLASS)).then(invocation -> mockPropertySource.getProperty(invocation.getArgumentAt(0, String.class)));
+        when(mockEnv.getProperty(GRAPH_FACTORY_CLASS)).then(invocation -> mockPropertySource.getProperty(invocation.getArgument(0)));
 
         factoryConfig.setEnvironment(mockEnv); // called by spring normally
 
@@ -132,7 +132,7 @@ public class FactoryConfigTest {
         propertySources.addFirst(mockPropertySource);
 
         when(mockEnv.getPropertySources()).thenReturn(propertySources);
-        when(mockEnv.getProperty(USER_FACTORY_CLASS)).then(invocation -> mockPropertySource.getProperty(invocation.getArgumentAt(0, String.class)));
+        when(mockEnv.getProperty(USER_FACTORY_CLASS)).then(invocation -> mockPropertySource.getProperty(invocation.getArgument(0)));
 
         factoryConfig.setEnvironment(mockEnv); // called by spring normally
 

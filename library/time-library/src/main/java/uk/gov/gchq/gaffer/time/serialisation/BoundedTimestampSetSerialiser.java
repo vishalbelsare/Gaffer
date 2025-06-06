@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 Crown Copyright
+ * Copyright 2017-2023 Crown Copyright
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,18 +13,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package uk.gov.gchq.gaffer.time.serialisation;
 
-import com.yahoo.memory.WritableMemory;
-import com.yahoo.sketches.sampling.ReservoirLongsUnion;
+import org.apache.datasketches.memory.WritableMemory;
+import org.apache.datasketches.sampling.ReservoirLongsUnion;
 import org.roaringbitmap.RoaringBitmap;
 
 import uk.gov.gchq.gaffer.bitmap.serialisation.utils.RoaringBitmapUtils;
-import uk.gov.gchq.gaffer.commonutil.CommonTimeUtil;
 import uk.gov.gchq.gaffer.exception.SerialisationException;
 import uk.gov.gchq.gaffer.serialisation.ToBytesSerialiser;
 import uk.gov.gchq.gaffer.serialisation.implementation.raw.CompactRawSerialisationUtils;
 import uk.gov.gchq.gaffer.time.BoundedTimestampSet;
+import uk.gov.gchq.gaffer.time.CommonTimeUtil.TimeBucket;
 import uk.gov.gchq.gaffer.time.RBMBackedTimestampSet;
 
 import java.io.ByteArrayInputStream;
@@ -79,7 +80,7 @@ public class BoundedTimestampSetSerialiser implements ToBytesSerialiser<BoundedT
         final ByteArrayInputStream bais = new ByteArrayInputStream(allBytes, offset, length);
         final DataInputStream dis = new DataInputStream(bais);
         final int bucketInt = (int) CompactRawSerialisationUtils.read(dis);
-        final CommonTimeUtil.TimeBucket bucket = CommonTimeUtil.TimeBucket.values()[bucketInt];
+        final TimeBucket bucket = TimeBucket.values()[bucketInt];
         final int maxSize = (int) CompactRawSerialisationUtils.read(dis);
         final BoundedTimestampSet boundedTimestampSet = new BoundedTimestampSet(bucket, maxSize);
         try {
@@ -102,7 +103,7 @@ public class BoundedTimestampSetSerialiser implements ToBytesSerialiser<BoundedT
                 if (-1 == dis.read(serialisedRLU)) {
                     throw new SerialisationException("Unexpected end of stream when reading serialised ReservoirLongsUnion");
                 }
-                final ReservoirLongsUnion reservoirLongsUnion = ReservoirLongsUnion.heapify(WritableMemory.wrap(serialisedRLU));
+                final ReservoirLongsUnion reservoirLongsUnion = ReservoirLongsUnion.heapify(WritableMemory.writableWrap(serialisedRLU));
                 boundedTimestampSet.setReservoirLongsUnion(reservoirLongsUnion);
             } else {
                 throw new SerialisationException("Unexpected byte indicating the state: expected " + NOT_FULL + " or "

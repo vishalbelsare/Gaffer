@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 Crown Copyright
+ * Copyright 2017-2024 Crown Copyright
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,14 +17,16 @@
 package uk.gov.gchq.gaffer.accumulostore.integration.delete;
 
 import uk.gov.gchq.gaffer.accumulostore.operation.impl.GetElementsWithinSet;
-import uk.gov.gchq.gaffer.commonutil.iterable.CloseableIterable;
 import uk.gov.gchq.gaffer.data.element.Element;
+import uk.gov.gchq.gaffer.operation.graph.SeededGraphFilters.IncludeIncomingOutgoingType;
 
-public class GetElementsWithinSetDeletedElementsIT extends AbstractDeletedElementsIT<GetElementsWithinSet, CloseableIterable<? extends Element>> {
+public class GetElementsWithinSetDeletedElementsIT extends AbstractDeletedElementsIT<GetElementsWithinSet, Iterable<? extends Element>> {
+
     @Override
     protected GetElementsWithinSet createGetOperation() {
         return new GetElementsWithinSet.Builder()
-                .input(VERTICES)
+                .input((Object[]) VERTICES)
+                .inOutType(IncludeIncomingOutgoingType.OUTGOING)
                 .build();
     }
 }

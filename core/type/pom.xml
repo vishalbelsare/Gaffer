@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  ~ Copyright 2016-2020 Crown Copyright
+  ~ Copyright 2016-2024 Crown Copyright
   ~
   ~ Licensed under the Apache License, Version 2.0 (the "License");
   ~ you may not use this file except in compliance with the License.
@@ -14,12 +14,13 @@
   ~ See the License for the specific language governing permissions and
   ~ limitations under the License.
   -->
+
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
     <parent>
         <groupId>uk.gov.gchq.gaffer</groupId>
         <artifactId>core</artifactId>
-        <version>1.20.1-SNAPSHOT</version>
+        <version>${revision}</version>
     </parent>
 
     <artifactId>type</artifactId>
@@ -33,14 +34,14 @@
         <dependency>
             <groupId>uk.gov.gchq.koryphe</groupId>
             <artifactId>core</artifactId>
-            <version>${koryphe.version}</version>
+            <classifier>jdk8</classifier>
         </dependency>
 
         <!-- Test dependencies -->
         <dependency>
             <groupId>uk.gov.gchq.koryphe</groupId>
             <artifactId>core</artifactId>
-            <version>${koryphe.version}</version>
+            <classifier>tests-jdk8</classifier>
             <type>test-jar</type>
             <scope>test</scope>
         </dependency>
@@ -56,12 +57,6 @@
             <artifactId>common-util</artifactId>
             <version>${project.parent.version}</version>
             <type>test-jar</type>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>uk.gov.gchq.gaffer</groupId>
-            <artifactId>time-library</artifactId>
-            <version>${project.parent.version}</version>
             <scope>test</scope>
         </dependency>
     </dependencies>

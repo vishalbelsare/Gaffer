@@ -1,5 +1,5 @@
 /*
- * Copyright 2016-2021 Crown Copyright
+ * Copyright 2016-2024 Crown Copyright
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,14 +18,12 @@ package uk.gov.gchq.gaffer.integration.impl;
 
 import com.google.common.collect.Lists;
 import org.apache.commons.lang3.BooleanUtils;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import uk.gov.gchq.gaffer.commonutil.CollectionUtil;
 import uk.gov.gchq.gaffer.commonutil.TestGroups;
 import uk.gov.gchq.gaffer.commonutil.TestPropertyNames;
-import uk.gov.gchq.gaffer.commonutil.iterable.CloseableIterable;
-import uk.gov.gchq.gaffer.commonutil.iterable.CloseableIterator;
-import uk.gov.gchq.gaffer.commonutil.iterable.EmptyClosableIterable;
+import uk.gov.gchq.gaffer.commonutil.iterable.EmptyIterable;
 import uk.gov.gchq.gaffer.data.element.Edge;
 import uk.gov.gchq.gaffer.data.element.Element;
 import uk.gov.gchq.gaffer.data.element.Entity;
@@ -42,12 +40,14 @@ import uk.gov.gchq.gaffer.graph.Graph;
 import uk.gov.gchq.gaffer.graph.GraphConfig;
 import uk.gov.gchq.gaffer.integration.AbstractStoreIT;
 import uk.gov.gchq.gaffer.integration.TraitRequirement;
+import uk.gov.gchq.gaffer.operation.OperationChain;
 import uk.gov.gchq.gaffer.operation.OperationException;
 import uk.gov.gchq.gaffer.operation.data.EdgeSeed;
 import uk.gov.gchq.gaffer.operation.data.EntitySeed;
 import uk.gov.gchq.gaffer.operation.graph.SeededGraphFilters.IncludeIncomingOutgoingType;
 import uk.gov.gchq.gaffer.operation.impl.add.AddElements;
 import uk.gov.gchq.gaffer.operation.impl.get.GetElements;
+import uk.gov.gchq.gaffer.operation.io.Output;
 import uk.gov.gchq.gaffer.store.StoreTrait;
 import uk.gov.gchq.gaffer.store.TestTypes;
 import uk.gov.gchq.gaffer.store.schema.Schema;
@@ -62,60 +62,54 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static uk.gov.gchq.gaffer.operation.SeedMatching.SeedMatchingType;
 
 public class GetElementsIT extends AbstractStoreIT {
     // ElementId Seeds
-    public static final Collection<ElementId> ENTITY_SEEDS_EXIST =
-            Arrays.asList(
-                    (ElementId) new EntitySeed(SOURCE_2),
-                    new EntitySeed(DEST_3),
-                    new EntitySeed(SOURCE_DIR_2),
-                    new EntitySeed(DEST_DIR_3));
+    private static final Collection<ElementId> ENTITY_SEEDS_EXIST = Arrays.asList(
+            (ElementId) new EntitySeed(SOURCE_2),
+            new EntitySeed(DEST_3),
+            new EntitySeed(SOURCE_DIR_2),
+            new EntitySeed(DEST_DIR_3));
 
-    public static final Collection<Element> ENTITIES_EXIST =
-            getElements(ENTITY_SEEDS_EXIST, null);
+    private static final Collection<Element> ENTITIES_EXIST = getElements(ENTITY_SEEDS_EXIST, null);
 
-    public static final Collection<ElementId> EDGE_SEEDS_EXIST =
-            Arrays.asList((ElementId) new EdgeSeed(SOURCE_1, DEST_1, false),
-                    (ElementId) new EdgeSeed(VERTEX_PREFIXES[0] + 0, VERTEX_PREFIXES[1] + 0),
-                    (ElementId) new EdgeSeed(VERTEX_PREFIXES[0] + 2, VERTEX_PREFIXES[1] + 2));
+    private static final Collection<ElementId> EDGE_SEEDS_EXIST = Arrays.asList(
+            (ElementId) new EdgeSeed(SOURCE_1, DEST_1, false),
+            (ElementId) new EdgeSeed(VERTEX_PREFIXES.get(0) + 0, VERTEX_PREFIXES.get(1) + 0),
+            (ElementId) new EdgeSeed(VERTEX_PREFIXES.get(0) + 2, VERTEX_PREFIXES.get(1) + 2));
 
-    public static final Collection<ElementId> EDGE_SEEDS_BOTH =
-            Arrays.asList((ElementId) new EdgeSeed(VERTEX_PREFIXES[0] + 0, VERTEX_PREFIXES[1] + 0),
-                    (ElementId) new EdgeSeed(VERTEX_PREFIXES[0] + 2, VERTEX_PREFIXES[1] + 2));
+    private static final Collection<ElementId> EDGE_SEEDS_BOTH = Arrays.asList(
+            (ElementId) new EdgeSeed(VERTEX_PREFIXES.get(0) + 0, VERTEX_PREFIXES.get(1) + 0),
+            (ElementId) new EdgeSeed(VERTEX_PREFIXES.get(0) + 2, VERTEX_PREFIXES.get(1) + 2));
 
-    public static final Collection<Element> EDGES_EXIST =
-            getElements(EDGE_SEEDS_EXIST, false);
+    private static final Collection<Element> EDGES_EXIST = getElements(EDGE_SEEDS_EXIST, false);
 
-    public static final Collection<ElementId> EDGE_DIR_SEEDS_EXIST =
-            Arrays.asList((ElementId) new EdgeSeed(SOURCE_DIR_1, DEST_DIR_1, true),
-                    (ElementId) new EdgeSeed(VERTEX_PREFIXES[0] + 0, VERTEX_PREFIXES[1] + 0),
-                    (ElementId) new EdgeSeed(VERTEX_PREFIXES[0] + 2, VERTEX_PREFIXES[1] + 2));
+    private static final Collection<ElementId> EDGE_DIR_SEEDS_EXIST = Arrays.asList(
+            (ElementId) new EdgeSeed(SOURCE_DIR_1, DEST_DIR_1, true),
+            (ElementId) new EdgeSeed(VERTEX_PREFIXES.get(0) + 0, VERTEX_PREFIXES.get(1) + 0),
+            (ElementId) new EdgeSeed(VERTEX_PREFIXES.get(0) + 2, VERTEX_PREFIXES.get(1) + 2));
 
-    public static final Collection<Element> EDGES_DIR_EXIST =
-            getElements(EDGE_DIR_SEEDS_EXIST, true);
+    private static final Collection<Element> EDGES_DIR_EXIST = getElements(EDGE_DIR_SEEDS_EXIST, true);
 
-    public static final Collection<ElementId> EDGE_SEEDS_DONT_EXIST =
-            Arrays.asList(
-                    (ElementId) new EdgeSeed(SOURCE_1, "dest2DoesNotExist", false),
-                    new EdgeSeed("source2DoesNotExist", DEST_1, false),
-                    new EdgeSeed(SOURCE_1, DEST_1, true)); // does not exist
+    private static final Collection<ElementId> EDGE_SEEDS_DONT_EXIST = Arrays.asList(
+            (ElementId) new EdgeSeed(SOURCE_1, "dest2DoesNotExist", false),
+            new EdgeSeed("source2DoesNotExist", DEST_1, false),
+            new EdgeSeed(SOURCE_1, DEST_1, true)); // does not exist
 
-    public static final Collection<ElementId> ENTITY_SEEDS_DONT_EXIST =
-            Collections.singletonList(
-                    (ElementId) new EntitySeed("idDoesNotExist"));
+    private static final Collection<ElementId> ENTITY_SEEDS_DONT_EXIST = Collections.singletonList(
+            (ElementId) new EntitySeed("idDoesNotExist"));
 
-    public static final Collection<ElementId> ENTITY_SEEDS = getEntityIds();
-    public static final Collection<ElementId> EDGE_SEEDS = getEdgeIds();
-    public static final Collection<ElementId> ALL_SEEDS = getAllSeeds();
-    public static final Collection<Object> ALL_SEED_VERTICES = getAllSeededVertices();
+    private static final Collection<ElementId> ENTITY_SEEDS = getEntityIds();
+    private static final Collection<ElementId> EDGE_SEEDS = getEdgeIds();
+    private static final Collection<ElementId> ALL_SEEDS = getAllSeeds();
+    private static final Collection<Object> ALL_SEED_VERTICES = getAllSeededVertices();
 
     @Override
     public void _setup() throws Exception {
@@ -139,17 +133,17 @@ public class GetElementsIT extends AbstractStoreIT {
                 for (final DirectedType directedType : directedTypes) {
                     for (final IncludeIncomingOutgoingType inOutType : inOutTypes) {
                         try {
-                            shouldGetElementsBySeed(includeEntities, includeEdges, directedType, inOutType);
+                            shouldGetElementsBySeed(includeEntities, false, directedType, inOutType);
                         } catch (final Throwable e) {
-                            throw new AssertionError("GetElementsBySeed failed with parameters: \nincludeEntities=" + includeEntities
-                                    + " \nincludeEdges=" + includeEdges + " \ndirectedType=" + directedType + " \ninOutType=" + inOutType, e);
+                            throw new AssertionError(String.format("GetElementsBySeed failed with parameters: %nincludeEntities=%s %nincludeEdges=%s %ndirectedType=%s %ninOutType=%s",
+                                    includeEntities, includeEdges, directedType, inOutType), e);
                         }
 
                         try {
                             shouldGetRelatedElements(includeEntities, includeEdges, directedType, inOutType);
                         } catch (final Throwable e) {
-                            throw new AssertionError("GetRelatedElements failed with parameters: \nincludeEntities=" + includeEntities
-                                    + " \nincludeEdges=" + includeEdges + " \ndirectedType=" + directedType + " \ninOutType=" + inOutType, e);
+                            throw new AssertionError(String.format("GetRelatedElements failed with parameters: %nincludeEntities=%s %nincludeEdges=%s %ndirectedType=%s %ninOutType=%s",
+                                    includeEntities, includeEdges, directedType, inOutType), e);
                         }
                     }
                 }
@@ -177,7 +171,7 @@ public class GetElementsIT extends AbstractStoreIT {
                 .build();
 
         // When
-        final CloseableIterable<? extends Element> resultsExcludingAllEdges = graph.execute(opExcludingAllEdges, user);
+        final Iterable<? extends Element> resultsExcludingAllEdges = graph.execute(opExcludingAllEdges, user);
 
         // Then
         ElementUtil.assertElementEquals(Arrays.asList(
@@ -192,15 +186,14 @@ public class GetElementsIT extends AbstractStoreIT {
                         .vertex(DEST_2)
                         .property(TestPropertyNames.SET, CollectionUtil.treeSet("3"))
                         .property(TestPropertyNames.COUNT, 1L)
-                        .build()
-                ),
+                        .build()),
                 resultsExcludingAllEdges);
 
         // When
-        final CloseableIterable<? extends Element> resultsIncludingAllEdges = graph.execute(opIncludingAllEdges, user);
+        final Iterable<? extends Element> resultsIncludingAllEdges = graph.execute(opIncludingAllEdges, user);
 
         // Then
-        ElementUtil.assertElementEquals(Arrays.asList(
+        ElementUtil.assertElementEqualsIncludingMatchedVertex(Arrays.asList(
                 new Edge.Builder()
                         .group(TestGroups.EDGE)
                         .source(SOURCE_1)
@@ -218,8 +211,7 @@ public class GetElementsIT extends AbstractStoreIT {
                         .matchedVertex(EdgeId.MatchedVertex.DESTINATION)
                         .property(TestPropertyNames.INT, 1)
                         .property(TestPropertyNames.COUNT, 1L)
-                        .build()
-                ),
+                        .build()),
                 resultsIncludingAllEdges);
     }
 
@@ -243,10 +235,10 @@ public class GetElementsIT extends AbstractStoreIT {
                 .build();
 
         // When
-        final CloseableIterable<? extends Element> resultsExcludingAllEntities = graph.execute(opExcludingAllEntities, user);
+        final Iterable<? extends Element> resultsExcludingAllEntities = graph.execute(opExcludingAllEntities, user);
 
         // Then
-        ElementUtil.assertElementEquals(Arrays.asList(
+        ElementUtil.assertElementEqualsIncludingMatchedVertex(Arrays.asList(
                 new Edge.Builder()
                         .group(TestGroups.EDGE)
                         .source(SOURCE_1)
@@ -264,12 +256,11 @@ public class GetElementsIT extends AbstractStoreIT {
                         .matchedVertex(EdgeId.MatchedVertex.DESTINATION)
                         .property(TestPropertyNames.INT, 1)
                         .property(TestPropertyNames.COUNT, 1L)
-                        .build()
-                ),
+                        .build()),
                 resultsExcludingAllEntities);
 
         // When
-        final CloseableIterable<? extends Element> resultsIncludingAllEntities = graph.execute(opIncludingAllEntities, user);
+        final Iterable<? extends Element> resultsIncludingAllEntities = graph.execute(opIncludingAllEntities, user);
 
         // Then
         ElementUtil.assertElementEquals(Arrays.asList(
@@ -284,8 +275,7 @@ public class GetElementsIT extends AbstractStoreIT {
                         .vertex(DEST_2)
                         .property(TestPropertyNames.SET, CollectionUtil.treeSet("3"))
                         .property(TestPropertyNames.COUNT, 1L)
-                        .build()
-                ),
+                        .build()),
                 resultsIncludingAllEntities);
 
     }
@@ -304,10 +294,10 @@ public class GetElementsIT extends AbstractStoreIT {
                 .build();
 
         // When
-        final CloseableIterable<? extends Element> results = graph.execute(op, user);
+        final Iterable<? extends Element> results = graph.execute(op, user);
 
         // Then
-        ElementUtil.assertElementEquals(Arrays.asList(
+        ElementUtil.assertElementEqualsIncludingMatchedVertex(Arrays.asList(
                 new Edge.Builder()
                         .group(TestGroups.EDGE)
                         .source(SOURCE_DIR_1)
@@ -334,8 +324,7 @@ public class GetElementsIT extends AbstractStoreIT {
                         .matchedVertex(EdgeId.MatchedVertex.SOURCE)
                         .property(TestPropertyNames.INT, 1)
                         .property(TestPropertyNames.COUNT, 1L)
-                        .build()
-                ),
+                        .build()),
                 results);
     }
 
@@ -358,10 +347,10 @@ public class GetElementsIT extends AbstractStoreIT {
                 .build();
 
         // When
-        final CloseableIterable<? extends Element> results = graph.execute(op, user);
+        final Iterable<? extends Element> results = graph.execute(op, user);
 
         // Then
-        ElementUtil.assertElementEquals(Arrays.asList(
+        ElementUtil.assertElementEqualsIncludingMatchedVertex(Arrays.asList(
                 new Edge.Builder()
                         .group(TestGroups.EDGE)
                         .source(SOURCE_DIR_1)
@@ -379,8 +368,7 @@ public class GetElementsIT extends AbstractStoreIT {
                         .matchedVertex(EdgeId.MatchedVertex.SOURCE)
                         .property(TestPropertyNames.INT, 1)
                         .property(TestPropertyNames.COUNT, 1L)
-                        .build()
-                ),
+                        .build()),
                 results);
     }
 
@@ -399,7 +387,7 @@ public class GetElementsIT extends AbstractStoreIT {
                 .build();
 
         // When
-        final CloseableIterable<? extends Element> results = graph.execute(op, user);
+        final Iterable<? extends Element> results = graph.execute(op, user);
 
         // Then
         for (final Element result : results) {
@@ -423,7 +411,7 @@ public class GetElementsIT extends AbstractStoreIT {
                 .build();
 
         // When
-        final CloseableIterable<? extends Element> results = graph.execute(op, user);
+        final Iterable<? extends Element> results = graph.execute(op, user);
 
         // Then
         for (final Element result : results) {
@@ -436,11 +424,11 @@ public class GetElementsIT extends AbstractStoreIT {
     public void shouldReturnEmptyIteratorIfNoSeedsProvidedForGetElementsBySeed() throws Exception {
         // Given
         final GetElements op = new GetElements.Builder()
-                .input(new EmptyClosableIterable<>())
+                .input(new EmptyIterable<>())
                 .build();
 
         // When
-        final CloseableIterable<? extends Element> results = graph.execute(op, getUser());
+        final Iterable<? extends Element> results = graph.execute(op, getUser());
 
         // Then
         assertThat(results.iterator().hasNext()).isFalse();
@@ -450,10 +438,10 @@ public class GetElementsIT extends AbstractStoreIT {
     public void shouldReturnEmptyIteratorIfNoSeedsProvidedForGetRelatedElements() throws Exception {
         // Given
         final GetElements op = new GetElements.Builder()
-                .input(new EmptyClosableIterable<>())
+                .input(new EmptyIterable<>())
                 .build();
         // When
-        final CloseableIterable<? extends Element> results = graph.execute(op, getUser());
+        final Iterable<? extends Element> results = graph.execute(op, getUser());
 
         // Then
         assertThat(results.iterator().hasNext()).isFalse();
@@ -467,32 +455,32 @@ public class GetElementsIT extends AbstractStoreIT {
         // This meant that the iterator would work when first used, but returned no results when used again
 
         // Given
-        Graph noAggregationGraph = createGraphVisibilityNoAggregation();
+        final Graph noAggregationGraph = createGraphVisibilityNoAggregation();
 
-        Entity testEntity = new Entity(TestGroups.ENTITY, "A");
+        final Entity testEntity = new Entity(TestGroups.ENTITY, "A");
 
         noAggregationGraph.execute(new AddElements.Builder()
                 .input(testEntity)
                 .build(), getUser());
 
         // When
-        final CloseableIterable<? extends Element> elementsIterator = noAggregationGraph.execute(new GetElements.Builder()
+        final Iterable<? extends Element> elementsIterator = noAggregationGraph.execute(new GetElements.Builder()
                 .input(new EntitySeed("A"))
                 .view(new View.Builder()
                         .entity(TestGroups.ENTITY)
                         .build())
                 .build(), getUser());
 
-        Entity expectedEntity = testEntity;
-        expectedEntity.putProperty(TestTypes.VISIBILITY, new String());
+        final Entity expectedEntity = testEntity;
+        expectedEntity.putProperty(TestTypes.VISIBILITY, "");
 
         // Then
         // Create a new iterator that should have 1 result, A
-        CloseableIterator<? extends Element> firstIt = elementsIterator.iterator();
+        final Iterator<? extends Element> firstIt = elementsIterator.iterator();
         assertThat(firstIt.hasNext()).isTrue();
         assertThat(firstIt.next()).isEqualTo(expectedEntity);
         // Check that a new iterator still has a result and the first GetElements did not change any data
-        CloseableIterator<? extends Element> secondIt = elementsIterator.iterator();
+        final Iterator<? extends Element> secondIt = elementsIterator.iterator();
         assertThat(secondIt.hasNext()).isTrue();
         assertThat(secondIt.next()).isEqualTo(expectedEntity);
     }
@@ -500,7 +488,8 @@ public class GetElementsIT extends AbstractStoreIT {
     private void shouldGetElementsBySeed(final boolean includeEntities,
                                          final boolean includeEdges,
                                          final DirectedType directedType,
-                                         final IncludeIncomingOutgoingType inOutType) throws Exception {
+                                         final IncludeIncomingOutgoingType inOutType)
+            throws Exception {
         final Set<Element> expectedElements = new HashSet<>();
         if (includeEntities) {
             expectedElements.addAll(ENTITIES_EXIST);
@@ -527,14 +516,14 @@ public class GetElementsIT extends AbstractStoreIT {
         } else {
             seeds = new ArrayList<>();
         }
-
-        shouldGetElements(expectedElements, SeedMatchingType.EQUAL, directedType, includeEntities, includeEdges, inOutType, seeds);
+        shouldGetElements(expectedElements, true, directedType, includeEntities, includeEdges, inOutType, seeds);
     }
 
     private void shouldGetRelatedElements(final boolean includeEntities,
                                           final boolean includeEdges,
                                           final DirectedType directedType,
-                                          final IncludeIncomingOutgoingType inOutType) throws Exception {
+                                          final IncludeIncomingOutgoingType inOutType)
+            throws Exception {
         final Set<ElementId> expectedElementIds = new HashSet<>();
         final Set<Element> expectedElements = new HashSet<>();
         if (includeEntities) {
@@ -550,12 +539,15 @@ public class GetElementsIT extends AbstractStoreIT {
             if (DirectedType.UNDIRECTED != directedType) {
                 expectedElementIds.add(new EdgeSeed(SOURCE_DIR_1, DEST_DIR_1, true));
 
-                if (null == inOutType || IncludeIncomingOutgoingType.EITHER == inOutType || IncludeIncomingOutgoingType.OUTGOING == inOutType) {
+                if (null == inOutType || IncludeIncomingOutgoingType.EITHER == inOutType
+                        || IncludeIncomingOutgoingType.OUTGOING == inOutType) {
                     expectedElementIds.add(new EdgeSeed(SOURCE_DIR_2, DEST_DIR_2, true));
                 }
 
-                if (null == inOutType || IncludeIncomingOutgoingType.EITHER == inOutType || IncludeIncomingOutgoingType.INCOMING == inOutType) {
-                    expectedElementIds.add(new EdgeSeed(SOURCE_DIR_3, DEST_DIR_3, true, EdgeId.MatchedVertex.DESTINATION));
+                if (null == inOutType || IncludeIncomingOutgoingType.EITHER == inOutType
+                        || IncludeIncomingOutgoingType.INCOMING == inOutType) {
+                    expectedElementIds
+                            .add(new EdgeSeed(SOURCE_DIR_3, DEST_DIR_3, true, EdgeId.MatchedVertex.DESTINATION));
                 }
             }
 
@@ -573,53 +565,100 @@ public class GetElementsIT extends AbstractStoreIT {
         if (DirectedType.UNDIRECTED == directedType) {
             expectedElements.removeIf(e -> e instanceof Edge && ((Edge) e).isDirected());
         }
-        shouldGetElements(expectedElements, SeedMatchingType.RELATED, directedType, includeEntities, includeEdges, inOutType, ALL_SEEDS);
+        shouldGetElements(expectedElements, false, directedType, includeEntities, includeEdges, inOutType, ALL_SEEDS);
     }
 
     private void shouldGetElements(final Collection<Element> expectedElements,
-                                   final SeedMatchingType seedMatching,
+                                   final boolean createChain,
                                    final DirectedType directedType,
                                    final boolean includeEntities,
                                    final boolean includeEdges,
                                    final IncludeIncomingOutgoingType inOutType,
-                                   final Iterable<ElementId> seeds) throws IOException, OperationException {
+                                   final Iterable<ElementId> seeds)
+            throws IOException, OperationException {
         // Given
         final User user = new User();
 
-        final View.Builder viewBuilder = new View.Builder();
-        if (includeEntities) {
-            viewBuilder.entity(TestGroups.ENTITY);
-        }
-        if (includeEdges) {
-            viewBuilder.edge(TestGroups.EDGE);
-        }
+        Output<Iterable<? extends Element>> opSeed;
+        Output<Iterable<? extends Element>> opElement;
 
-        final GetElements opSeed = new GetElements.Builder()
-                .input(seeds)
-                .directedType(directedType)
-                .inOutType(inOutType)
-                .view(viewBuilder.build())
-                .seedMatching(seedMatching)
-                .build();
-
-        Collection<ElementId> seedCollection = StreamSupport.stream(seeds.spliterator(), false)
+        final Collection<ElementId> seedCollection = StreamSupport.stream(seeds.spliterator(), false)
                 .collect(Collectors.toList());
 
-        final GetElements opElement = new GetElements.Builder()
-                .input(getElements(seedCollection, null))
-                .directedType(directedType)
-                .inOutType(inOutType)
-                .view(viewBuilder.build())
-                .seedMatching(seedMatching)
-                .build();
+        if (createChain && includeEntities && includeEdges) {
+            opSeed = new OperationChain.Builder()
+                    .first(new GetElements.Builder()
+                            .input(seeds)
+                            .directedType(directedType)
+                            .inOutType(inOutType)
+                            .view(new View.Builder()
+                                    .entity(TestGroups.ENTITY)
+                                    .build())
+                            .build())
+                    .then(new GetElements.Builder()
+                            .input(seeds)
+                            .directedType(directedType)
+                            .inOutType(inOutType)
+                            .view(new View.Builder()
+                                    .edge(TestGroups.EDGE)
+                                    .build())
+                            .build())
+                    .build();
+
+            opElement = new OperationChain.Builder()
+                    .first(new GetElements.Builder()
+                            .input(getElements(seedCollection, null))
+                            .directedType(directedType)
+                            .inOutType(inOutType)
+                            .view(new View.Builder()
+                                    .entity(TestGroups.ENTITY)
+                                    .build())
+                            .build())
+                    .then(new GetElements.Builder()
+                            .input(getElements(seedCollection, null))
+                            .directedType(directedType)
+                            .inOutType(inOutType)
+                            .view(new View.Builder()
+                                    .edge(TestGroups.EDGE)
+                                    .build())
+                            .build())
+                    .build();
+        } else {
+            final View.Builder viewBuilder = new View.Builder();
+            if (includeEntities) {
+                viewBuilder.entity(TestGroups.ENTITY);
+            }
+            if (includeEdges) {
+                viewBuilder.edge(TestGroups.EDGE);
+            }
+
+            opSeed = new GetElements.Builder()
+                    .input(seeds)
+                    .directedType(directedType)
+                    .inOutType(inOutType)
+                    .view(viewBuilder.build())
+                    .build();
+
+            opElement = new GetElements.Builder()
+                    .input(getElements(seedCollection, null))
+                    .directedType(directedType)
+                    .inOutType(inOutType)
+                    .view(viewBuilder.build())
+                    .build();
+        }
 
         // When
-        final CloseableIterable<? extends Element> resultsSeed = graph.execute(opSeed, user);
-        final CloseableIterable<? extends Element> resultsElement = graph.execute(opElement, user);
+        final Iterable<? extends Element> resultsSeed = graph.execute(opSeed, user);
+        final Iterable<? extends Element> resultsElement = graph.execute(opElement, user);
 
         // Then
-        ElementUtil.assertElementEquals(expectedElements, resultsSeed, true);
-        ElementUtil.assertElementEquals(expectedElements, resultsElement, true);
+        if (includeEdges && inOutType == IncludeIncomingOutgoingType.INCOMING) {
+            ElementUtil.assertElementEquals(expectedElements, resultsSeed, true);
+            ElementUtil.assertElementEquals(expectedElements, resultsElement, true);
+        } else {
+            ElementUtil.assertElementEqualsIncludingMatchedVertex(expectedElements, resultsSeed, true);
+            ElementUtil.assertElementEqualsIncludingMatchedVertex(expectedElements, resultsElement, true);
+        }
     }
 
     private static Collection<Element> getElements(final Collection<ElementId> seeds, final Boolean direction) {
@@ -675,14 +714,14 @@ public class GetElementsIT extends AbstractStoreIT {
     }
 
     private static Collection<ElementId> getEntityIds() {
-        Set<ElementId> allSeeds = new HashSet<>();
+        final Set<ElementId> allSeeds = new HashSet<>();
         allSeeds.addAll(ENTITY_SEEDS_EXIST);
         allSeeds.addAll(ENTITY_SEEDS_DONT_EXIST);
         return allSeeds;
     }
 
     private static Collection<ElementId> getEdgeIds() {
-        Set<ElementId> allSeeds = new HashSet<>();
+        final Set<ElementId> allSeeds = new HashSet<>();
         allSeeds.addAll(EDGE_SEEDS_EXIST);
         allSeeds.addAll(EDGE_DIR_SEEDS_EXIST);
         allSeeds.addAll(EDGE_SEEDS_DONT_EXIST);
@@ -691,14 +730,14 @@ public class GetElementsIT extends AbstractStoreIT {
     }
 
     private static Collection<ElementId> getAllSeeds() {
-        Set<ElementId> allSeeds = new HashSet<>();
+        final Set<ElementId> allSeeds = new HashSet<>();
         allSeeds.addAll(ENTITY_SEEDS);
         allSeeds.addAll(EDGE_SEEDS);
         return allSeeds;
     }
 
     private static Collection<Object> getAllSeededVertices() {
-        Set<Object> allSeededVertices = new HashSet<>();
+        final Set<Object> allSeededVertices = new HashSet<>();
         for (final ElementId elementId : ENTITY_SEEDS_EXIST) {
             allSeededVertices.add(((EntityId) elementId).getVertex());
         }

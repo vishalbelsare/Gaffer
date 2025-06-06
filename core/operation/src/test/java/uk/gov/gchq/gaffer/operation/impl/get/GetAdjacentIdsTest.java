@@ -1,5 +1,5 @@
 /*
- * Copyright 2016-2021 Crown Copyright
+ * Copyright 2016-2023 Crown Copyright
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,10 +16,9 @@
 
 package uk.gov.gchq.gaffer.operation.impl.get;
 
-import com.google.common.collect.Lists;
+import org.assertj.core.util.Lists;
 import org.junit.jupiter.api.Test;
 
-import uk.gov.gchq.gaffer.commonutil.iterable.CloseableIterable;
 import uk.gov.gchq.gaffer.data.element.Entity;
 import uk.gov.gchq.gaffer.data.element.id.DirectedType;
 import uk.gov.gchq.gaffer.data.element.id.EntityId;
@@ -32,10 +31,7 @@ import uk.gov.gchq.gaffer.operation.graph.SeededGraphFilters.IncludeIncomingOutg
 
 import java.util.Iterator;
 
-import static junit.framework.TestCase.assertNotNull;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotSame;
 
 public class GetAdjacentIdsTest extends OperationTest<GetAdjacentIds> {
 
@@ -51,7 +47,7 @@ public class GetAdjacentIdsTest extends OperationTest<GetAdjacentIds> {
                 .build();
 
         // Then
-        assertEquals(DirectedType.EITHER, op.getDirectedType());
+        assertThat(op.getDirectedType()).isEqualTo(DirectedType.EITHER);
     }
 
     @Test
@@ -60,7 +56,7 @@ public class GetAdjacentIdsTest extends OperationTest<GetAdjacentIds> {
         final Class<?> outputClass = getTestObject().getOutputClass();
 
         // Then
-        assertEquals(CloseableIterable.class, outputClass);
+        assertThat(outputClass).isEqualTo(Iterable.class);
     }
 
     @Test
@@ -90,8 +86,8 @@ public class GetAdjacentIdsTest extends OperationTest<GetAdjacentIds> {
                         .build())
                 .build();
 
-        assertEquals(IncludeIncomingOutgoingType.EITHER, op.getIncludeIncomingOutGoing());
-        assertNotNull(op.getView());
+        assertThat(op.getIncludeIncomingOutGoing()).isEqualTo(IncludeIncomingOutgoingType.EITHER);
+        assertThat(op.getView()).isNotNull();
     }
 
     @Test
@@ -105,7 +101,7 @@ public class GetAdjacentIdsTest extends OperationTest<GetAdjacentIds> {
                 .build();
 
         // Then
-        assertEquals(IncludeIncomingOutgoingType.EITHER, op.getIncludeIncomingOutGoing());
+        assertThat(op.getIncludeIncomingOutGoing()).isEqualTo(IncludeIncomingOutgoingType.EITHER);
     }
 
     @Test
@@ -129,9 +125,8 @@ public class GetAdjacentIdsTest extends OperationTest<GetAdjacentIds> {
                         .edge("testEdgeGroup")
                         .build())
                 .build();
-        assertEquals(IncludeIncomingOutgoingType.INCOMING,
-                op.getIncludeIncomingOutGoing());
-        assertNotNull(op.getView());
+        assertThat(op.getIncludeIncomingOutGoing()).isEqualTo(IncludeIncomingOutgoingType.INCOMING);
+        assertThat(op.getView()).isNotNull();
         assertThat(op.getInput().iterator().next()).isEqualTo(seed);
     }
 
@@ -162,12 +157,11 @@ public class GetAdjacentIdsTest extends OperationTest<GetAdjacentIds> {
 
 
         // Then
-        assertNotSame(getAdjacentIds, clone);
-        assertEquals(DirectedType.DIRECTED, clone.getDirectedType());
-        assertEquals(IncludeIncomingOutgoingType.INCOMING,
-                clone.getIncludeIncomingOutGoing());
-        assertEquals(view, clone.getView());
-        assertEquals(Lists.newArrayList(input), Lists.newArrayList(clone.getInput()));
+        assertThat(clone).isNotSameAs(getAdjacentIds);
+        assertThat(clone.getDirectedType()).isEqualTo(DirectedType.DIRECTED);
+        assertThat(clone.getIncludeIncomingOutGoing()).isEqualTo(IncludeIncomingOutgoingType.INCOMING);
+        assertThat(view).isEqualTo(clone.getView());
+        assertThat(clone.getInput().iterator().next()).isEqualTo(input);
     }
 
     @Test
@@ -178,9 +172,8 @@ public class GetAdjacentIdsTest extends OperationTest<GetAdjacentIds> {
                 .build();
 
         // Then
-        assertEquals(
-                Lists.newArrayList(new EntitySeed("1"), new EntitySeed("2"), new Entity("group1", "3")),
-                Lists.newArrayList(op.getInput())
+        assertThat(Lists.newArrayList(op.getInput()))
+                .isEqualTo(Lists.newArrayList(new EntitySeed("1"), new EntitySeed("2"), new Entity("group1", "3"))
         );
     }
 

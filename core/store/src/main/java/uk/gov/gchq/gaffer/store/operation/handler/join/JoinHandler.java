@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020 Crown Copyright
+ * Copyright 2018-2024 Crown Copyright
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,9 +16,8 @@
 
 package uk.gov.gchq.gaffer.store.operation.handler.join;
 
-
 import uk.gov.gchq.gaffer.commonutil.exception.LimitExceededException;
-import uk.gov.gchq.gaffer.commonutil.iterable.LimitedCloseableIterable;
+import uk.gov.gchq.gaffer.operation.Operation;
 import uk.gov.gchq.gaffer.operation.OperationException;
 import uk.gov.gchq.gaffer.operation.impl.join.Join;
 import uk.gov.gchq.gaffer.operation.impl.join.match.MatchKey;
@@ -27,6 +26,7 @@ import uk.gov.gchq.gaffer.operation.impl.join.methods.JoinType;
 import uk.gov.gchq.gaffer.store.Context;
 import uk.gov.gchq.gaffer.store.Store;
 import uk.gov.gchq.gaffer.store.operation.handler.OutputOperationHandler;
+import uk.gov.gchq.koryphe.iterable.LimitedIterable;
 import uk.gov.gchq.koryphe.tuple.MapTuple;
 
 import java.util.ArrayList;
@@ -64,9 +64,9 @@ public class JoinHandler<I> implements OutputOperationHandler<Join<I>, Iterable<
 
         JoinFunction joinFunction = operation.getJoinType().createInstance();
 
-        updateOperationInput(operation.getOperation(), null);
+        updateOperationInput(getOperationFromJoin(operation), null);
         Iterable<I> rightIterable =
-                (Iterable<I>) getResultsOrNull(operation.getOperation(),
+                (Iterable<I>) getResultsOrNull(getOperationFromJoin(operation),
                         context,
                         store);
 
@@ -74,12 +74,16 @@ public class JoinHandler<I> implements OutputOperationHandler<Join<I>, Iterable<
         final Iterable limitedRightIterable;
 
         try {
-            limitedLeftIterable = new LimitedCloseableIterable(operation.getInput(), 0, limit, false);
-            limitedRightIterable = new LimitedCloseableIterable(rightIterable, 0, limit, false);
+            limitedLeftIterable = new LimitedIterable(operation.getInput(), 0, limit, false);
+            limitedRightIterable = new LimitedIterable(rightIterable, 0, limit, false);
             return joinFunction.join(limitedLeftIterable, limitedRightIterable, operation.getMatchMethod(), matchKey, operation.isFlatten());
         } catch (final LimitExceededException e) {
             throw new OperationException("Join exceeded the collectionLimit, a solution is to increasing collectionLimit value in the join operation.", e);
         }
 
+    }
+
+    protected Operation getOperationFromJoin(final Join<I> operation) {
+        return operation.getOperation();
     }
 }

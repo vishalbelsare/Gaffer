@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  ~ Copyright 2016-2020 Crown Copyright
+  ~ Copyright 2016-2024 Crown Copyright
   ~
   ~ Licensed under the Apache License, Version 2.0 (the "License");
   ~ you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@
     <parent>
         <groupId>uk.gov.gchq.gaffer</groupId>
         <artifactId>rest-api</artifactId>
-        <version>1.20.1-SNAPSHOT</version>
+        <version>${revision}</version>
     </parent>
 
     <artifactId>map-rest</artifactId>
@@ -62,11 +62,11 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-dependency-plugin</artifactId>
-                <version>${dependency.plugin.version}</version>
                 <executions>
                     <execution>
+                        <?m2e ignore?>
                         <id>unpack</id>
-                        <phase>compile</phase>
+                        <phase>prepare-package</phase>
                         <goals>
                             <goal>unpack</goal>
                         </goals>
@@ -77,6 +77,7 @@
                                     <artifactId>core-rest</artifactId>
                                     <version>${project.parent.version}</version>
                                     <type>war</type>
+                                    <classifier>${war.classifier}</classifier>
                                     <overWrite>false</overWrite>
                                     <outputDirectory>
                                         ${project.build.directory}/${project.artifactId}-${project.version}

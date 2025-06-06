@@ -1,5 +1,5 @@
 /*
- * Copyright 2016-2020 Crown Copyright
+ * Copyright 2016-2024 Crown Copyright
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,26 +16,35 @@
 
 package uk.gov.gchq.gaffer.proxystore.integration;
 
-import org.junit.AfterClass;
+import org.junit.platform.suite.api.ConfigurationParameter;
+import org.junit.platform.suite.api.ExcludeClassNamePatterns;
 
 import uk.gov.gchq.gaffer.commonutil.StreamUtil;
 import uk.gov.gchq.gaffer.integration.AbstractStoreITs;
-import uk.gov.gchq.gaffer.integration.impl.GeneratorsIT;
-import uk.gov.gchq.gaffer.integration.impl.JoinIT;
 import uk.gov.gchq.gaffer.proxystore.ProxyProperties;
-import uk.gov.gchq.gaffer.proxystore.SingleUseMapProxyStore;
+import uk.gov.gchq.gaffer.store.schema.Schema;
 
+import static uk.gov.gchq.gaffer.integration.junit.extensions.IntegrationTestSuiteExtension.INIT_CLASS;
+
+import java.util.Collections;
+import java.util.Map;
+
+@ExcludeClassNamePatterns({"uk.gov.gchq.gaffer.integration.impl.JoinIT",
+                           "uk.gov.gchq.gaffer.integration.impl.GeneratorsIT"}) // Skipped because: The output type reference doesn't deserialise the output correctly
+@ConfigurationParameter(key = INIT_CLASS, value = "uk.gov.gchq.gaffer.proxystore.integration.ProxyStoreITs")
 public class ProxyStoreITs extends AbstractStoreITs {
-    private static final ProxyProperties STORE_PROPERTIES = ProxyProperties.loadStoreProperties(StreamUtil.openStream(ProxyStoreITs.class, "/mock-proxy-store.properties"));
 
-    public ProxyStoreITs() {
-        super(STORE_PROPERTIES);
-        skipTest(JoinIT.class, "The output type reference doesn't deserialise the output correctly");
-        skipTest(GeneratorsIT.class, "The output type reference doesn't deserialise the domain object correctly");
-    }
+    private static final ProxyProperties STORE_PROPERTIES = ProxyProperties
+            .loadStoreProperties(StreamUtil.openStream(ProxyStoreITs.class, "/mock-proxy-store.properties"));
 
-    @AfterClass
-    public static void afterClass() {
-        SingleUseMapProxyStore.cleanUp();
+    private static final Schema SCHEMA = new Schema();
+
+    private static final Map<String, String> TESTS_TO_SKIP =
+        Collections.singletonMap("shouldGetElements", "GetElementsIT.shouldGetElements - fails due to potentially incorrect test. See issue #3314");
+
+    ProxyStoreITs() {
+        setSchema(SCHEMA);
+        setStoreProperties(STORE_PROPERTIES);
+        setTestsToSkip(TESTS_TO_SKIP);
     }
 }

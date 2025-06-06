@@ -1,5 +1,5 @@
 /*
- * Copyright 2016-2020 Crown Copyright
+ * Copyright 2016-2023 Crown Copyright
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,28 +18,26 @@ package uk.gov.gchq.gaffer.store.schema;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
-import com.fasterxml.jackson.annotation.JsonSetter;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonPOJOBuilder;
 import com.google.common.collect.Lists;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
-import uk.gov.gchq.gaffer.commonutil.CommonConstants;
 import uk.gov.gchq.gaffer.commonutil.GroupUtil;
 import uk.gov.gchq.gaffer.commonutil.ToStringBuilder;
-import uk.gov.gchq.gaffer.commonutil.iterable.ChainedIterable;
-import uk.gov.gchq.gaffer.core.exception.GafferRuntimeException;
 import uk.gov.gchq.gaffer.data.elementdefinition.ElementDefinitions;
 import uk.gov.gchq.gaffer.data.elementdefinition.exception.SchemaException;
-import uk.gov.gchq.gaffer.exception.SerialisationException;
 import uk.gov.gchq.gaffer.jsonserialisation.JSONSerialiser;
 import uk.gov.gchq.gaffer.serialisation.Serialiser;
+import uk.gov.gchq.gaffer.store.schema.exception.SplitElementGroupDefSchemaException;
+import uk.gov.gchq.gaffer.store.schema.exception.VertexSerialiserSchemaException;
+import uk.gov.gchq.gaffer.store.schema.exception.VisibilityPropertySchemaException;
 import uk.gov.gchq.koryphe.ValidationResult;
-import uk.gov.gchq.koryphe.serialisation.json.SimpleClassNameIdResolver;
+import uk.gov.gchq.koryphe.iterable.ChainedIterable;
 
 import java.io.InputStream;
-import java.io.UnsupportedEncodingException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -51,6 +49,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import static java.util.Objects.nonNull;
 
@@ -75,13 +74,11 @@ import static java.util.Objects.nonNull;
 @JsonDeserialize(builder = Schema.Builder.class)
 @JsonPropertyOrder(value = {"class", "edges", "entities", "types"}, alphabetic = true)
 public class Schema extends ElementDefinitions<SchemaEntityDefinition, SchemaEdgeDefinition> implements Cloneable {
+    public static final String FORMAT_EXCEPTION = "%s, options are: %s and %s";
+    public static final String FORMAT_UNABLE_TO_MERGE_SCHEMAS_CONFLICT_WITH_S = "Unable to merge schemas because of conflict with the %s";
+    public static final String FORMAT_ERROR_WITH_THE_SCHEMA_TYPE_NAMED_S_DUE_TO_S = "Error with the schema type named:%s due to: %s";
+    public static final String ERROR_MERGING_SCHEMA_DUE_TO = "Error merging Schema due to: ";
     private final TypeDefinition unknownType = new TypeDefinition();
-
-    /**
-     * @deprecated the ID should not be used. The ID should be supplied to the graph library separately
-     */
-    @Deprecated
-    private String id;
 
     /**
      * The {@link Serialiser} for all vertices.
@@ -96,12 +93,6 @@ public class Schema extends ElementDefinitions<SchemaEntityDefinition, SchemaEdg
     private Map<String, TypeDefinition> types;
 
     private String visibilityProperty;
-
-    /**
-     * @deprecated use a store property specific to your chosen store instead.
-     */
-    @Deprecated
-    private String timestampProperty;
 
     private Map<String, String> config;
 
@@ -123,24 +114,6 @@ public class Schema extends ElementDefinitions<SchemaEntityDefinition, SchemaEdg
 
     public static Schema fromJson(final byte[]... jsonBytes) throws SchemaException {
         return new Schema.Builder().json(jsonBytes).build();
-    }
-
-    /**
-     * @return schema id
-     * @deprecated the ID should be supplied to the graph library separately
-     */
-    @Deprecated
-    public String getId() {
-        return id;
-    }
-
-    /**
-     * @param id the schema id
-     * @deprecated the ID should be supplied to the graph library separately
-     */
-    @Deprecated
-    public void setId(final String id) {
-        this.id = id;
     }
 
     @SuppressWarnings("CloneDoesntCallSuperClone")
@@ -230,10 +203,8 @@ public class Schema extends ElementDefinitions<SchemaEntityDefinition, SchemaEdg
 
     public boolean hasValidation() {
         for (final SchemaElementDefinition elementDef : new ChainedIterable<SchemaElementDefinition>(getEntities().values(), getEdges().values())) {
-            if (null != elementDef) {
-                if (elementDef.hasValidation()) {
-                    return true;
-                }
+            if (elementDef != null && elementDef.hasValidation()) {
+                return true;
             }
         }
         return false;
@@ -269,16 +240,6 @@ public class Schema extends ElementDefinitions<SchemaEntityDefinition, SchemaEdg
         return vertexSerialiser;
     }
 
-    @Deprecated
-    @JsonIgnore
-    public String getVertexSerialiserClass() {
-        if (null == vertexSerialiser) {
-            return null;
-        }
-
-        return SimpleClassNameIdResolver.getSimpleClassName(vertexSerialiser.getClass());
-    }
-
     @Override
     public SchemaElementDefinition getElement(final String group) {
         return (SchemaElementDefinition) super.getElement(group);
@@ -286,15 +247,6 @@ public class Schema extends ElementDefinitions<SchemaEntityDefinition, SchemaEdg
 
     public String getVisibilityProperty() {
         return visibilityProperty;
-    }
-
-    /**
-     * @return the timestamp property
-     * @deprecated use a store property specific to your chosen store instead.
-     */
-    @Deprecated
-    public String getTimestampProperty() {
-        return timestampProperty;
     }
 
     public Map<String, String> getConfig() {
@@ -314,13 +266,9 @@ public class Schema extends ElementDefinitions<SchemaEntityDefinition, SchemaEdg
 
     @Override
     public String toString() {
-        try {
-            return new ToStringBuilder(this)
-                    .append(new String(toJson(true), CommonConstants.UTF_8))
-                    .build();
-        } catch (final UnsupportedEncodingException e) {
-            throw new RuntimeException(e);
-        }
+        return new ToStringBuilder(this)
+                .append(new String(toJson(true), StandardCharsets.UTF_8))
+                .build();
     }
 
     public byte[] toCompactJson() throws SchemaException {
@@ -338,17 +286,6 @@ public class Schema extends ElementDefinitions<SchemaEntityDefinition, SchemaEdg
         }
 
         /**
-         * @param id the id.
-         * @return this builder.
-         * @deprecated the ID should not be used. The ID should be supplied to the graph library separately
-         */
-        @Deprecated
-        public CHILD_CLASS id(final String id) {
-            getThisSchema().id = id;
-            return self();
-        }
-
-        /**
          * Sets the {@link Serialiser}.
          *
          * @param vertexSerialiser the {@link Serialiser} to set
@@ -357,34 +294,6 @@ public class Schema extends ElementDefinitions<SchemaEntityDefinition, SchemaEdg
         @JsonTypeInfo(use = JsonTypeInfo.Id.CLASS, include = JsonTypeInfo.As.PROPERTY, property = "class")
         public CHILD_CLASS vertexSerialiser(final Serialiser vertexSerialiser) {
             getThisSchema().vertexSerialiser = vertexSerialiser;
-            return self();
-        }
-
-        /**
-         * Sets the {@link Serialiser} from class name.
-         *
-         * @param vertexSerialiserClass the {@link Serialiser} class name to set
-         * @return this Builder
-         */
-        @Deprecated
-        @JsonSetter("vertexSerialiserClass")
-        public CHILD_CLASS vertexSerialiserClass(final String vertexSerialiserClass) {
-            if (null == vertexSerialiserClass) {
-                getThisSchema().vertexSerialiser = null;
-            } else {
-                Class<? extends Serialiser> serialiserClass;
-                try {
-                    serialiserClass = Class.forName(SimpleClassNameIdResolver.getClassName(vertexSerialiserClass)).asSubclass(Serialiser.class);
-                } catch (final ClassNotFoundException e) {
-                    throw new SchemaException(e.getMessage(), e);
-                }
-                try {
-                    vertexSerialiser(serialiserClass.newInstance());
-                } catch (final IllegalAccessException | IllegalArgumentException | SecurityException | InstantiationException e) {
-                    throw new SchemaException(e.getMessage(), e);
-                }
-            }
-
             return self();
         }
 
@@ -410,17 +319,6 @@ public class Schema extends ElementDefinitions<SchemaEntityDefinition, SchemaEdg
             return self();
         }
 
-        /**
-         * @param timestampProperty the timestamp property
-         * @return the builder
-         * @deprecated This is an advanced feature - if you use it then make sure you really understand it. To continue using it you should add a Schema config setting with key "timestampProperty".
-         */
-        @Deprecated
-        public CHILD_CLASS timestampProperty(final String timestampProperty) {
-            getThisSchema().timestampProperty = timestampProperty;
-            return self();
-        }
-
         public CHILD_CLASS config(final Map<String, String> config) {
             getThisSchema().config = config;
             return self();
@@ -435,42 +333,30 @@ public class Schema extends ElementDefinitions<SchemaEntityDefinition, SchemaEdg
         @JsonIgnore
         public CHILD_CLASS merge(final Schema schema) {
             if (nonNull(schema)) {
-                Schema thatSchema;
                 try {
-                    thatSchema = JSONSerialiser.deserialise(JSONSerialiser.serialise(schema), Schema.class);
-                } catch (final SerialisationException e) {
-                    throw new GafferRuntimeException("Error merging Schema", e);
+                    Schema thatSchema = JSONSerialiser.deserialise(JSONSerialiser.serialise(schema), Schema.class);
+
+                    validateSharedGroupsAreCompatible(thatSchema);
+
+                    mergeElements(thatSchema);
+
+                    mergeVertexSerialiser(thatSchema);
+
+                    mergeVisibility(thatSchema);
+
+                    mergeTypes(thatSchema);
+
+                    mergeConfig(thatSchema);
+
+                } catch (final SchemaException e) {
+                    e.prependToMessage(ERROR_MERGING_SCHEMA_DUE_TO);
+                    throw e;
+                } catch (final Exception e) {
+                    throw new SchemaException(ERROR_MERGING_SCHEMA_DUE_TO + e.getMessage(), e);
                 }
-
-                validateSharedGroupsAreCompatible(thatSchema);
-
-                mergeSchemaId(thatSchema);
-
-                mergeElements(thatSchema);
-
-                mergeVertexSerialiser(thatSchema);
-
-                mergeVisibility(thatSchema);
-
-                mergeTimeStamp(thatSchema);
-
-                mergeTypes(thatSchema);
-
-                mergeConfig(thatSchema);
             }
 
             return self();
-        }
-
-        @Deprecated
-        private void mergeSchemaId(final Schema schema) {
-            // Schema ID is deprecated - remove this when ID is removed.
-            if (null == getThisSchema().getId()) {
-                getThisSchema().setId(schema.getId());
-            } else if (null != schema.getId()
-                    && !schema.getId().equals(getThisSchema().getId())) {
-                getThisSchema().setId(getThisSchema().getId() + "_" + schema.getId());
-            }
         }
 
         private void mergeEntities(final Schema thatSchema) {
@@ -514,8 +400,7 @@ public class Schema extends ElementDefinitions<SchemaEntityDefinition, SchemaEdg
                 if (null == getThisSchema().vertexSerialiser) {
                     getThisSchema().vertexSerialiser = thatSchema.getVertexSerialiser();
                 } else if (!getThisSchema().vertexSerialiser.getClass().equals(thatSchema.getVertexSerialiser().getClass())) {
-                    throw new SchemaException("Unable to merge schemas. Conflict with vertex serialiser, options are: "
-                            + getThisSchema().vertexSerialiser.getClass().getName() + " and " + thatSchema.getVertexSerialiser().getClass().getName());
+                    throw new VertexSerialiserSchemaException(getThisSchema().vertexSerialiser.getClass().getName(), thatSchema.getVertexSerialiser().getClass().getName());
                 }
             }
         }
@@ -524,18 +409,7 @@ public class Schema extends ElementDefinitions<SchemaEntityDefinition, SchemaEdg
             if (null == getThisSchema().visibilityProperty) {
                 getThisSchema().visibilityProperty = thatSchema.getVisibilityProperty();
             } else if (null != thatSchema.getVisibilityProperty() && !getThisSchema().visibilityProperty.equals(thatSchema.getVisibilityProperty())) {
-                throw new SchemaException("Unable to merge schemas. Conflict with visibility property, options are: "
-                        + getThisSchema().visibilityProperty + " and " + thatSchema.getVisibilityProperty());
-            }
-        }
-
-        @Deprecated
-        private void mergeTimeStamp(final Schema thatSchema) {
-            if (null == getThisSchema().timestampProperty) {
-                getThisSchema().timestampProperty = thatSchema.getTimestampProperty();
-            } else if (null != thatSchema.getTimestampProperty() && !getThisSchema().timestampProperty.equals(thatSchema.getTimestampProperty())) {
-                throw new SchemaException("Unable to merge schemas. Conflict with timestamp property, options are: "
-                        + getThisSchema().timestampProperty + " and " + thatSchema.getTimestampProperty());
+                throw new VisibilityPropertySchemaException(getThisSchema().visibilityProperty, thatSchema.getVisibilityProperty());
             }
         }
 
@@ -550,7 +424,14 @@ public class Schema extends ElementDefinitions<SchemaEntityDefinition, SchemaEdg
                     if (null == typeDef) {
                         getThisSchema().types.put(newType, newTypeDef);
                     } else {
-                        typeDef.merge(newTypeDef);
+                        try {
+                            typeDef.merge(newTypeDef);
+                        } catch (final SchemaException e) {
+                            e.prependToMessage(String.format(FORMAT_ERROR_WITH_THE_SCHEMA_TYPE_NAMED_S_DUE_TO_S, entry.getKey(), ""));
+                            throw e;
+                        } catch (final Exception e) {
+                            throw new SchemaException(String.format(FORMAT_ERROR_WITH_THE_SCHEMA_TYPE_NAMED_S_DUE_TO_S, entry.getKey(), e.getMessage()), e);
+                        }
                     }
                 }
             }
@@ -569,9 +450,11 @@ public class Schema extends ElementDefinitions<SchemaEntityDefinition, SchemaEdg
             mergeEdges(thatSchema);
         }
 
-        private void validateSharedGroupsAreCompatible(final Schema schema) {
-            validateSharedGroupsAreCompatible(getThisSchema().getEntities(), schema.getEntities());
-            validateSharedGroupsAreCompatible(getThisSchema().getEdges(), schema.getEdges());
+        private void validateSharedGroupsAreCompatible(final Schema thatSchema) {
+            final String thisVisibilityProperty = getThisSchema().visibilityProperty;
+            final String thatVisibilityProperty = thatSchema.visibilityProperty;
+            validateSharedGroupsAreCompatible(getThisSchema().getEntities(), thatSchema.getEntities(), thisVisibilityProperty, thatVisibilityProperty);
+            validateSharedGroupsAreCompatible(getThisSchema().getEdges(), thatSchema.getEdges(), thisVisibilityProperty, thatVisibilityProperty);
         }
 
         @JsonIgnore
@@ -605,9 +488,6 @@ public class Schema extends ElementDefinitions<SchemaEntityDefinition, SchemaEdg
 
             getThisSchema().types = Collections.unmodifiableMap(getThisSchema().types);
 
-            if (null != getThisSchema().timestampProperty) {
-                getThisSchema().addConfig("timestampProperty", getThisSchema().timestampProperty);
-            }
             return super.build();
         }
 
@@ -615,39 +495,43 @@ public class Schema extends ElementDefinitions<SchemaEntityDefinition, SchemaEdg
             return getElementDefs();
         }
 
-        private void validateSharedGroupsAreCompatible(final Map<String, ? extends SchemaElementDefinition> elements1, final Map<String, ? extends SchemaElementDefinition> elements2) {
-            final Set<String> sharedGroups = new HashSet<>(elements1.keySet());
-            sharedGroups.retainAll(elements2.keySet());
+        private void validateSharedGroupsAreCompatible(final Map<String, ? extends SchemaElementDefinition> thisElements, final Map<String, ? extends SchemaElementDefinition> thatElements, final String thisVisibilityProperty, final String thatVisibilityProperty) {
+            final Set<String> sharedGroups = new HashSet<>(thisElements.keySet());
+            sharedGroups.retainAll(thatElements.keySet());
+
             if (!sharedGroups.isEmpty()) {
                 // Groups are shared. Check they are compatible.
                 for (final String sharedGroup : sharedGroups) {
 
                     // Check if just one group has the properties and groupBy fields set.
-                    final SchemaElementDefinition elementDef1 = elements1.get(sharedGroup);
-                    if ((null == elementDef1.properties || elementDef1.properties.isEmpty())
-                            && elementDef1.groupBy.isEmpty()) {
+                    final SchemaElementDefinition thisElementDef = thisElements.get(sharedGroup);
+
+                    if ((null == thisElementDef.properties || thisElementDef.properties.isEmpty())
+                            && thisElementDef.groupBy.isEmpty()) {
                         continue;
                     }
-                    final SchemaElementDefinition elementDef2 = elements2.get(sharedGroup);
-                    if ((null == elementDef2.properties || elementDef2.properties.isEmpty())
-                            && elementDef2.groupBy.isEmpty()) {
+                    final SchemaElementDefinition thatElementDef = thatElements.get(sharedGroup);
+                    if ((null == thatElementDef.properties || thatElementDef.properties.isEmpty())
+                            && thatElementDef.groupBy.isEmpty()) {
                         continue;
                     }
 
+                    final Map<String, String> thisProperties = getPropertiesWithoutVisibility(thisVisibilityProperty, thisElementDef);
+                    final Map<String, String> thatProperties = getPropertiesWithoutVisibility(thatVisibilityProperty, thatElementDef);
+
                     // Check to see if the properties are the same.
-                    if (Objects.equals(elementDef1.properties, elementDef2.properties)
-                            && Objects.equals(elementDef1.groupBy, elementDef2.groupBy)) {
+                    if (Objects.equals(thisProperties, thatProperties)
+                            && Objects.equals(thisElementDef.groupBy, thatElementDef.groupBy)) {
                         continue;
                     }
 
                     // Check to see if either of the properties are a subset of another properties
-                    if (elementDef2.properties.entrySet().containsAll(elementDef1.properties.entrySet()) ||
-                            elementDef1.properties.entrySet().containsAll(elementDef2.properties.entrySet())) {
+                    if (thatProperties.entrySet().containsAll(thisProperties.entrySet())
+                            || thisProperties.entrySet().containsAll(thatProperties.entrySet())) {
                         continue;
                     }
 
-                    throw new SchemaException("Element group properties cannot be defined in different schema parts, they must all be defined in a single schema part. "
-                            + "Please fix this group: " + sharedGroup);
+                    throw new SplitElementGroupDefSchemaException(sharedGroup);
                 }
             }
         }
@@ -666,6 +550,12 @@ public class Schema extends ElementDefinitions<SchemaEntityDefinition, SchemaEdg
             getThisSchema().getEdgeGroups().forEach(GroupUtil::validateName);
 
             getThisSchema().getEntityGroups().forEach(GroupUtil::validateName);
+        }
+
+        private static Map<String, String> getPropertiesWithoutVisibility(final String visibilityProperty, final SchemaElementDefinition elementDef) {
+            return elementDef.properties.entrySet().stream()
+                    .filter(s -> !Objects.equals(s.getKey(), visibilityProperty))
+                    .collect(Collectors.toMap(Entry::getKey, Entry::getValue));
         }
     }
 

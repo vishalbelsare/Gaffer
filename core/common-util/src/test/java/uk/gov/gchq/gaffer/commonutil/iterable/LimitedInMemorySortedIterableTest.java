@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2021 Crown Copyright
+ * Copyright 2017-2024 Crown Copyright
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,14 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package uk.gov.gchq.gaffer.commonutil.iterable;
 
 import com.google.common.collect.Lists;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Random;
@@ -28,12 +27,12 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 
-public class LimitedInMemorySortedIterableTest {
+class LimitedInMemorySortedIterableTest {
 
     @Test
-    public void shouldLimitEntries() {
+    void shouldLimitEntries() {
         final LimitedInMemorySortedIterable<Integer> list = new LimitedInMemorySortedIterable<Integer>(Comparator.naturalOrder(), 100);
         final List<Integer> expectedItems = new ArrayList<>();
         IntStream.rangeClosed(1, 100).forEach(expectedItems::add);
@@ -42,11 +41,11 @@ public class LimitedInMemorySortedIterableTest {
             list.add(i);
         }
 
-        assertEquals(expectedItems, Lists.newArrayList(list));
+        assertThat(list).containsExactlyElementsOf(expectedItems);
     }
 
     @Test
-    public void shouldLimitAndDeduplicateEntries() {
+    void shouldLimitAndDeduplicateEntries() {
         final LimitedInMemorySortedIterable<Integer> list = new LimitedInMemorySortedIterable<Integer>(Comparator.naturalOrder(), 2, true);
 
         list.add(1);
@@ -56,31 +55,31 @@ public class LimitedInMemorySortedIterableTest {
         list.add(2);
         list.add(10);
 
-        assertEquals(Arrays.asList(1, 2), Lists.newArrayList(list));
+        assertThat(list).containsExactly(1, 2);
     }
 
     @Test
-    public void shouldDeduplicateEntries() {
+    void shouldDeduplicateEntries() {
         final LimitedInMemorySortedIterable<Integer> list = new LimitedInMemorySortedIterable<Integer>(Comparator.naturalOrder(), 100, true);
 
         list.add(1);
         list.add(1);
 
-        assertEquals(Collections.singletonList(1), Lists.newArrayList(list));
+        assertThat(list).containsExactly(1);
     }
 
     @Test
-    public void shouldNotDeduplicateEntries() {
+    void shouldNotDeduplicateEntries() {
         final LimitedInMemorySortedIterable<Integer> list = new LimitedInMemorySortedIterable<Integer>(Comparator.naturalOrder(), 100, false);
 
         list.add(1);
         list.add(1);
 
-        assertEquals(Arrays.asList(1, 1), Lists.newArrayList(list));
+        assertThat(list).containsExactly(1, 1);
     }
 
     @Test
-    public void shouldLimitAndNotDeduplicateEntries() {
+    void shouldLimitAndNotDeduplicateEntries() {
         final LimitedInMemorySortedIterable<Integer> list = new LimitedInMemorySortedIterable<Integer>(Comparator.naturalOrder(), 4, false);
 
         list.add(1);
@@ -88,14 +87,24 @@ public class LimitedInMemorySortedIterableTest {
         list.add(1);
         list.add(2);
         list.add(10);
-
-        assertEquals(Arrays.asList(1, 1, 2, 2), Lists.newArrayList(list));
+        assertThat(list).containsExactly(1, 1, 2, 2);
     }
 
     @Test
-    public void shouldAddAll() {
-        final LimitedInMemorySortedIterable<Integer> itr = new LimitedInMemorySortedIterable<Integer>(Comparator
-                .naturalOrder(), 100);
+    void shouldInsertNewItemAndRemoveOldItemWhenlimitIsReachedAndNewItemIsLessThanLastEntry() {
+        final LimitedInMemorySortedIterable<Integer> list = new LimitedInMemorySortedIterable<Integer>(Comparator.naturalOrder(), 3, false);
+
+        list.add(3);
+        list.add(2);
+        list.add(3);
+        list.add(2);
+
+        assertThat(list).hasSize(3).containsExactly(2, 2, 3);
+    }
+
+    @Test
+    void shouldAddAll() {
+        final LimitedInMemorySortedIterable<Integer> itr = new LimitedInMemorySortedIterable<Integer>(Comparator.naturalOrder(), 100);
 
         // When/Then
         final List<Integer> evens = IntStream.iterate(0, i -> i + 2)
@@ -127,10 +136,9 @@ public class LimitedInMemorySortedIterableTest {
     }
 
     @Test
-    public void shouldLimitEntriesOnAddAll() {
+    void shouldLimitEntriesOnAddAll() {
         // Given
-        final LimitedInMemorySortedIterable<Integer> itr = new LimitedInMemorySortedIterable<Integer>(Comparator
-                .naturalOrder(), 10);
+        final LimitedInMemorySortedIterable<Integer> itr = new LimitedInMemorySortedIterable<Integer>(Comparator.naturalOrder(), 10);
 
         // When/Then
         final List<Integer> evens = IntStream.iterate(0, i -> i + 2)
@@ -162,7 +170,7 @@ public class LimitedInMemorySortedIterableTest {
     }
 
     @Test
-    public void shouldSortLargeNumberOfItems() {
+    void shouldSortLargeNumberOfItems() {
         // Given
         final int streamSize = 1000000;
         final int resultLimit = 10000;
@@ -181,6 +189,29 @@ public class LimitedInMemorySortedIterableTest {
 
         // Then
         final List<Integer> expected = Lists.newArrayList(list);
-        assertEquals(expected, sortedElements);
+        assertThat(sortedElements).isEqualTo(expected);
+    }
+
+    @Test
+    void shouldThrowExceptionWithNoComparator() {
+        assertThatExceptionOfType(IllegalArgumentException.class)
+            .isThrownBy(() -> new LimitedInMemorySortedIterable<Integer>(null, 100))
+            .withMessage("Comparator is required");
+    }
+
+    @Test
+    void shouldThrowExceptionWithInvalidLimit() {
+        assertThatExceptionOfType(IllegalArgumentException.class)
+            .isThrownBy(() -> new LimitedInMemorySortedIterable<Integer>(Comparator.naturalOrder(), 0))
+            .withMessage("Limit cannot be less than or equal to 0");
+    }
+
+    @Test
+    void shouldReturnToString() {
+        final LimitedInMemorySortedIterable<Integer> list = new LimitedInMemorySortedIterable<Integer>(Comparator.naturalOrder(), 1);
+        list.add(1);
+
+        assertThat(list)
+            .hasToString("LimitedInMemorySortedIterable[size=1,limit=1,deduplicate=false,backingMap={1=OneOrMore[deduplicate=false,singleItem=1]}]");
     }
 }

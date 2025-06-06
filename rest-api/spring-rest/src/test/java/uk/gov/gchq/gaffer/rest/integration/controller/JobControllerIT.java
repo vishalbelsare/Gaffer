@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2021 Crown Copyright
+ * Copyright 2020-2024 Crown Copyright
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,8 +18,8 @@ package uk.gov.gchq.gaffer.rest.integration.controller;
 
 import com.google.common.collect.Lists;
 import org.assertj.core.api.Assertions;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 
@@ -58,21 +58,19 @@ import java.util.concurrent.TimeUnit;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.Mockito.when;
-import static uk.gov.gchq.gaffer.cache.util.CacheProperties.CACHE_SERVICE_CLASS;
-import static uk.gov.gchq.gaffer.store.StoreProperties.OPERATION_DECLARATIONS;
 
 public class JobControllerIT extends AbstractRestApiIT {
 
     @Autowired
     private GraphFactory graphFactory; // This will be a Mock (see application-test.properties)
 
-    @Before
+    @BeforeEach
     public void setupGraph() {
         StoreProperties properties = new MapStoreProperties();
         properties.setStoreClass(SingleUseMapStore.class);
         properties.setJobTrackerEnabled(true);
-        properties.set(CACHE_SERVICE_CLASS, HashMapCacheService.class.getName());
-        properties.set(OPERATION_DECLARATIONS, "ResultCacheExportOperations.json");
+        properties.setDefaultCacheServiceClass(HashMapCacheService.class.getName());
+        properties.setOperationDeclarationPaths("ResultCacheExportOperations.json");
 
         Graph graph = new Graph.Builder()
                 .config(new GraphConfig("myGraph"))

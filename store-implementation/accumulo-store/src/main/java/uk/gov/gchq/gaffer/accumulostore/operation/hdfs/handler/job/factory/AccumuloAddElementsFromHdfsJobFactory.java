@@ -1,5 +1,5 @@
 /*
- * Copyright 2016-2020 Crown Copyright
+ * Copyright 2016-2023 Crown Copyright
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package uk.gov.gchq.gaffer.accumulostore.operation.hdfs.handler.job.factory;
 
 import org.apache.accumulo.core.client.mapreduce.AccumuloFileOutputFormat;
@@ -34,7 +35,6 @@ import uk.gov.gchq.gaffer.accumulostore.operation.hdfs.reducer.AccumuloKeyValueR
 import uk.gov.gchq.gaffer.accumulostore.utils.AccumuloStoreConstants;
 import uk.gov.gchq.gaffer.accumulostore.utils.IngestUtils;
 import uk.gov.gchq.gaffer.accumulostore.utils.TableUtils;
-import uk.gov.gchq.gaffer.commonutil.CommonConstants;
 import uk.gov.gchq.gaffer.hdfs.operation.AddElementsFromHdfs;
 import uk.gov.gchq.gaffer.hdfs.operation.handler.job.factory.AddElementsFromHdfsJobFactory;
 import uk.gov.gchq.gaffer.hdfs.operation.partitioner.NoPartitioner;
@@ -42,6 +42,7 @@ import uk.gov.gchq.gaffer.store.Store;
 import uk.gov.gchq.gaffer.store.StoreException;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 
 public class AccumuloAddElementsFromHdfsJobFactory implements AddElementsFromHdfsJobFactory {
     private static final Logger LOGGER = LoggerFactory.getLogger(AccumuloAddElementsFromHdfsJobFactory.class);
@@ -67,8 +68,8 @@ public class AccumuloAddElementsFromHdfsJobFactory implements AddElementsFromHdf
         final JobConf jobConf = new JobConf(configuration);
 
         LOGGER.info("Setting up job conf");
-        jobConf.set(SCHEMA, new String(store.getSchema().toCompactJson(), CommonConstants.UTF_8));
-        LOGGER.debug("Added {} {} to job conf", SCHEMA, new String(store.getSchema().toCompactJson(), CommonConstants.UTF_8));
+        jobConf.set(SCHEMA, new String(store.getSchema().toCompactJson(), StandardCharsets.UTF_8));
+        LOGGER.debug("Added {} {} to job conf", SCHEMA, new String(store.getSchema().toCompactJson(), StandardCharsets.UTF_8));
         jobConf.set(MAPPER_GENERATOR, mapperGeneratorClassName);
         LOGGER.info("Added {} of {} to job conf", MAPPER_GENERATOR, mapperGeneratorClassName);
         jobConf.set(VALIDATE, String.valueOf(operation.isValidate()));
@@ -77,11 +78,6 @@ public class AccumuloAddElementsFromHdfsJobFactory implements AddElementsFromHdf
         if (null != operation.getNumMapTasks()) {
             jobConf.setNumMapTasks(operation.getNumMapTasks());
             LOGGER.info("Set number of map tasks to {} on job conf", operation.getNumMapTasks());
-        }
-
-        if (null != operation.getNumReduceTasks()) {
-            jobConf.setNumReduceTasks(operation.getNumReduceTasks());
-            LOGGER.info("Set number of reduce tasks to {} on job conf", operation.getNumReduceTasks());
         }
 
         jobConf.set(AccumuloStoreConstants.ACCUMULO_ELEMENT_CONVERTER_CLASS,
@@ -107,7 +103,7 @@ public class AccumuloAddElementsFromHdfsJobFactory implements AddElementsFromHdf
         if (!NoPartitioner.class.equals(operation.getPartitioner())) {
             if (null != operation.getPartitioner()) {
                 operation.setPartitioner(GafferKeyRangePartitioner.class);
-                LOGGER.warn("Partitioner class " + operation.getPartitioner().getName() + " will be replaced with " + GafferKeyRangePartitioner.class.getName());
+                LOGGER.warn("Partitioner class {} will be replaced with {}", operation.getPartitioner().getName(), GafferKeyRangePartitioner.class.getName());
             }
             setupPartitioner(job, operation, (AccumuloStore) store);
         }
@@ -149,16 +145,9 @@ public class AccumuloAddElementsFromHdfsJobFactory implements AddElementsFromHdf
         final String splitsFilePath = operation.getSplitsFilePath();
         LOGGER.info("Creating splits file in location {} from table {}", splitsFilePath, store.getTableName());
 
-        final int minReducers;
-        final int maxReducers;
+        final int minReducers = validateValue(operation.getMinReduceTasks());
+        final int maxReducers = validateValue(operation.getMaxReduceTasks());
         int numReducers;
-        if (validateValue(operation.getNumReduceTasks()) != 0) {
-            minReducers = validateValue(operation.getNumReduceTasks());
-            maxReducers = validateValue(operation.getNumReduceTasks());
-        } else {
-            minReducers = validateValue(operation.getMinReduceTasks());
-            maxReducers = validateValue(operation.getMaxReduceTasks());
-        }
 
         try {
             numReducers = 1 + IngestUtils.createSplitsFile(store.getConnection(), store.getTableName(),

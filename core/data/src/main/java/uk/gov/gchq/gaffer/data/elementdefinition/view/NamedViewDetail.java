@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 Crown Copyright
+ * Copyright 2017-2023 Crown Copyright
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,7 +30,6 @@ import uk.gov.gchq.gaffer.access.AccessControlledResource;
 import uk.gov.gchq.gaffer.access.ResourceType;
 import uk.gov.gchq.gaffer.access.predicate.AccessPredicate;
 import uk.gov.gchq.gaffer.access.predicate.UnrestrictedAccessPredicate;
-import uk.gov.gchq.gaffer.commonutil.CommonConstants;
 import uk.gov.gchq.gaffer.commonutil.StringUtil;
 import uk.gov.gchq.gaffer.commonutil.ToStringBuilder;
 import uk.gov.gchq.gaffer.data.elementdefinition.view.access.predicate.NamedViewWriteAccessPredicate;
@@ -39,10 +38,9 @@ import uk.gov.gchq.gaffer.jsonserialisation.JSONSerialiser;
 import uk.gov.gchq.gaffer.user.User;
 
 import java.io.Serializable;
-import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 import static java.util.Collections.emptyList;
 
@@ -54,7 +52,6 @@ import static java.util.Collections.emptyList;
 @JsonDeserialize(builder = NamedViewDetail.Builder.class)
 public class NamedViewDetail implements AccessControlledResource, Serializable {
     private static final long serialVersionUID = -8354836093398004122L;
-    private static final String CHARSET_NAME = CommonConstants.UTF_8;
     private String name;
     private String view;
     private String description;
@@ -88,8 +85,8 @@ public class NamedViewDetail implements AccessControlledResource, Serializable {
         setParameters(parameters);
 
         try {
-            this.readAccessPredicate = readAccessPredicate != null ? new String(JSONSerialiser.serialise(readAccessPredicate)) : null;
-            this.writeAccessPredicate = writeAccessPredicate != null ? new String(JSONSerialiser.serialise(writeAccessPredicate)) : null;
+            this.readAccessPredicate = readAccessPredicate != null ? new String(JSONSerialiser.serialise(readAccessPredicate), StandardCharsets.UTF_8) : null;
+            this.writeAccessPredicate = writeAccessPredicate != null ? new String(JSONSerialiser.serialise(writeAccessPredicate), StandardCharsets.UTF_8) : null;
         } catch (final SerialisationException e) {
             throw new IllegalArgumentException("Access Predicates must be json serialisable", e);
         }
@@ -122,9 +119,9 @@ public class NamedViewDetail implements AccessControlledResource, Serializable {
     public void setView(final View view) {
         if (null != view) {
             try {
-                this.view = new String(JSONSerialiser.serialise(view), Charset.forName(CHARSET_NAME));
+                this.view = new String(JSONSerialiser.serialise(view), StandardCharsets.UTF_8);
             } catch (final SerialisationException se) {
-                throw new IllegalArgumentException(se.getMessage());
+                throw new IllegalArgumentException(se.getMessage(), se);
             }
         } else {
             throw new IllegalArgumentException("View cannot be null");
@@ -145,11 +142,6 @@ public class NamedViewDetail implements AccessControlledResource, Serializable {
 
     public List<String> getWriteAccessRoles() {
         return writeAccessRoles;
-    }
-
-    @Deprecated
-    public boolean hasWriteAccess(final String userId, final Set<String> opAuths, final String adminAuth) {
-        return hasWriteAccess(new User.Builder().userId(userId).opAuths(opAuths).build(), adminAuth);
     }
 
     @Override
@@ -206,7 +198,7 @@ public class NamedViewDetail implements AccessControlledResource, Serializable {
                     viewStringWithDefaults = viewStringWithDefaults.replace(buildParamNameString(paramKey),
                             StringUtil.toString(JSONSerialiser.serialise(parameterDetailPair.getValue().getDefaultValue())));
                 } catch (final SerialisationException e) {
-                    throw new IllegalArgumentException(e.getMessage());
+                    throw new IllegalArgumentException(e.getMessage(), e);
                 }
             }
         }
@@ -250,7 +242,7 @@ public class NamedViewDetail implements AccessControlledResource, Serializable {
                 viewString = viewString.replace(buildParamNameString(paramKey),
                         StringUtil.toString(JSONSerialiser.serialise(paramValueObj)));
             } catch (final SerialisationException e) {
-                throw new IllegalArgumentException(e.getMessage());
+                throw new IllegalArgumentException(e.getMessage(), e);
             }
         }
 
@@ -259,7 +251,7 @@ public class NamedViewDetail implements AccessControlledResource, Serializable {
         try {
             view = JSONSerialiser.deserialise(StringUtil.toBytes(viewString), View.class);
         } catch (final Exception e) {
-            throw new IllegalArgumentException(e.getMessage());
+            throw new IllegalArgumentException(e.getMessage(), e);
         }
         return view;
     }
@@ -381,10 +373,10 @@ public class NamedViewDetail implements AccessControlledResource, Serializable {
         public Builder view(final View view) {
             if (null != view) {
                 try {
-                    this.view = new String(JSONSerialiser.serialise(view), Charset.forName(CHARSET_NAME));
+                    this.view = new String(JSONSerialiser.serialise(view), StandardCharsets.UTF_8);
                     return this;
                 } catch (final SerialisationException se) {
-                    throw new IllegalArgumentException(se.getMessage());
+                    throw new IllegalArgumentException(se.getMessage(), se);
                 }
             } else {
                 throw new IllegalArgumentException("View cannot be null");

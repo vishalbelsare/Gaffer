@@ -1,5 +1,5 @@
 /*
- * Copyright 2016-2020 Crown Copyright
+ * Copyright 2016-2023 Crown Copyright
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package uk.gov.gchq.gaffer.integration.domain;
 
 import uk.gov.gchq.gaffer.commonutil.ToStringBuilder;
@@ -117,7 +118,7 @@ public class EdgeDomainObject extends DomainObject {
         if (!Objects.equals(intProperty, that.intProperty)) {
             return false;
         }
-        return !(!Objects.equals(count, that.count));
+        return Objects.equals(count, that.count);
 
     }
 

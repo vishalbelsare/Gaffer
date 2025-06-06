@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 Crown Copyright
+ * Copyright 2017-2024 Crown Copyright
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,17 +17,19 @@
 package uk.gov.gchq.gaffer.commonutil.iterable;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.stream.Stream;
 
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
-public class StreamIteratorTest {
+@ExtendWith(MockitoExtension.class)
+class StreamIteratorTest {
 
     @Test
-    public void shouldDelegateCloseToWrappedIterator() {
-        final Stream<Object> stream = mock(Stream.class);
+    void shouldDelegateCloseToWrappedIterator(@Mock final Stream<Object> stream) {
         final StreamIterator<Object> streamIterator = new StreamIterator<>(stream);
 
         streamIterator.close();

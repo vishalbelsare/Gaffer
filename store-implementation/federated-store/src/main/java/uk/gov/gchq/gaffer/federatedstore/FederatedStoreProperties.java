@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 Crown Copyright
+ * Copyright 2017-2024 Crown Copyright
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@
 
 package uk.gov.gchq.gaffer.federatedstore;
 
-import uk.gov.gchq.gaffer.cache.util.CacheProperties;
+import uk.gov.gchq.gaffer.cache.impl.HashMapCacheService;
 import uk.gov.gchq.gaffer.store.StoreProperties;
 
 import java.io.InputStream;
@@ -28,24 +28,27 @@ import java.nio.file.Path;
  */
 public class FederatedStoreProperties extends StoreProperties {
     /**
-     * This is used....
-     * e.g gaffer.federatedstore.isPublicAllowed=true
+     * Controls if adding graphs with public access is allowed.
+     * True by default.
+     * e.g. gaffer.federatedstore.isPublicAllowed=true
      */
     public static final String IS_PUBLIC_ACCESS_ALLOWED = "gaffer.federatedstore.isPublicAllowed";
     public static final String IS_PUBLIC_ACCESS_ALLOWED_DEFAULT = String.valueOf(true);
     /**
-     * This is used....
-     * e.g gaffer.federatedstore.customPropertiesAuths="auth1"
+     * String containing auths for allowing users to use store properties other than those contained in a graph library.
+     * Unset by default, allowing all users to do this.
+     * e.g. gaffer.federatedstore.customPropertiesAuths="auth1"
      */
     public static final String CUSTOM_PROPERTIES_AUTHS = "gaffer.federatedstore.customPropertiesAuths";
     public static final String CUSTOM_PROPERTIES_AUTHS_DEFAULT = null;
-
+    public static final String CACHE_SERVICE_CLASS_DEFAULT = HashMapCacheService.class.getCanonicalName();
+    public static final String STORE_CONFIGURED_MERGE_FUNCTIONS = "gaffer.federatedstore.storeConfiguredMergeFunctions";
+    public static final String STORE_CONFIGURED_GRAPHIDS = "gaffer.federatedstore.storeConfiguredGraphIds";
+    public static final String CACHE_SERVICE_FEDERATED_STORE_SUFFIX = "gaffer.cache.service.federated.store.suffix";
     /**
-     * This is used....
-     * eg.gaffer.federatedstore.cache.service.class="uk.gov.gchq.gaffer.cache.impl.HashMapCacheService"
+     * Name of the system property to use for defining a cache service class dedicated to the Federated Store.
      */
-    public static final String CACHE_SERVICE_CLASS = CacheProperties.CACHE_SERVICE_CLASS;
-    public static final String CACHE_SERVICE_CLASS_DEFAULT = null;
+    public static final String CACHE_SERVICE_FEDERATED_STORE_CLASS = "gaffer.cache.service.federatedstore.class";
 
     public FederatedStoreProperties() {
         super(FederatedStore.class);
@@ -67,20 +70,16 @@ public class FederatedStoreProperties extends StoreProperties {
         set(CUSTOM_PROPERTIES_AUTHS, auths);
     }
 
-    public void setCacheProperties(final String cacheServiceClassString) {
-        set(CACHE_SERVICE_CLASS, cacheServiceClassString);
-    }
-
-    public String getCacheProperties() {
-        return get(CACHE_SERVICE_CLASS, CACHE_SERVICE_CLASS_DEFAULT);
-    }
-
     public String getCustomPropsValue() {
         return this.get(CUSTOM_PROPERTIES_AUTHS, CUSTOM_PROPERTIES_AUTHS_DEFAULT);
     }
 
     public String getIsPublicAccessAllowed() {
-        return get(IS_PUBLIC_ACCESS_ALLOWED, IS_PUBLIC_ACCESS_ALLOWED_DEFAULT);
+        return getIsPublicAccessAllowed(IS_PUBLIC_ACCESS_ALLOWED_DEFAULT);
+    }
+
+    public String getIsPublicAccessAllowed(final String defaultValue) {
+        return get(IS_PUBLIC_ACCESS_ALLOWED, defaultValue);
     }
 
     public void setFalseGraphsCanHavePublicAccess() {
@@ -93,5 +92,37 @@ public class FederatedStoreProperties extends StoreProperties {
 
     public void setGraphsCanHavePublicAccess(final boolean b) {
         set(IS_PUBLIC_ACCESS_ALLOWED, Boolean.toString(b));
+    }
+
+    public String getStoreConfiguredMergeFunctions() {
+        return get(STORE_CONFIGURED_MERGE_FUNCTIONS);
+    }
+
+    public void setStoreConfiguredMergeFunctions(final String mergeFunctionFile) {
+        set(STORE_CONFIGURED_MERGE_FUNCTIONS, mergeFunctionFile);
+    }
+
+    public String getStoreConfiguredGraphIds() {
+        return get(STORE_CONFIGURED_GRAPHIDS);
+    }
+
+    public void setStoreConfiguredGraphIds(final String mergeFunctionFile) {
+        set(STORE_CONFIGURED_GRAPHIDS, mergeFunctionFile);
+    }
+
+    public String getCacheServiceFederatedStoreSuffix(final String defaultValue) {
+        return getCacheServiceFederatedStoreSuffix(this, defaultValue);
+    }
+
+    public static String getCacheServiceFederatedStoreSuffix(final StoreProperties properties, final String defaultValue) {
+        return properties.get(CACHE_SERVICE_FEDERATED_STORE_SUFFIX, properties.getCacheServiceDefaultSuffix(defaultValue));
+    }
+
+    public String getFederatedStoreCacheServiceClass() {
+        return get(CACHE_SERVICE_FEDERATED_STORE_CLASS);
+    }
+
+    public void setFederatedStoreCacheServiceClass(final String cacheServiceClassString) {
+        set(CACHE_SERVICE_FEDERATED_STORE_CLASS, cacheServiceClassString);
     }
 }

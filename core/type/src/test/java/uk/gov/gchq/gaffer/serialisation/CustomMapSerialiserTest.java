@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 Crown Copyright
+ * Copyright 2017-2024 Crown Copyright
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,28 +16,23 @@
 
 package uk.gov.gchq.gaffer.serialisation;
 
-import com.google.common.collect.Lists;
 import org.junit.jupiter.api.Test;
 
-import uk.gov.gchq.gaffer.commonutil.CommonTimeUtil;
 import uk.gov.gchq.gaffer.commonutil.pair.Pair;
 import uk.gov.gchq.gaffer.exception.SerialisationException;
 import uk.gov.gchq.gaffer.serialisation.implementation.StringSerialiser;
-import uk.gov.gchq.gaffer.serialisation.implementation.raw.RawFloatSerialiser;
-import uk.gov.gchq.gaffer.time.RBMBackedTimestampSet;
-import uk.gov.gchq.gaffer.time.serialisation.RBMBackedTimestampSetSerialiser;
+import uk.gov.gchq.gaffer.serialisation.implementation.ordered.OrderedFloatSerialiser;
+import uk.gov.gchq.gaffer.serialisation.implementation.ordered.OrderedIntegerSerialiser;
 import uk.gov.gchq.gaffer.types.CustomMap;
 
-import java.time.Instant;
+import static org.assertj.core.api.Assertions.assertThat;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-
-public class CustomMapSerialiserTest extends ToBytesSerialisationTest<CustomMap> {
+class CustomMapSerialiserTest extends ToBytesSerialisationTest<CustomMap> {
 
     @Test
-    public void shouldSerialiseStringInt() throws SerialisationException {
+    void shouldSerialiseStringInt() throws SerialisationException {
         // Given
-        final CustomMap<String, Integer> expected = new CustomMap<>(new StringSerialiser(), new IntegerSerialiser());
+        final CustomMap<String, Integer> expected = new CustomMap<>(new StringSerialiser(), new OrderedIntegerSerialiser());
         expected.put("one", 111);
         expected.put("two", 221);
 
@@ -45,63 +40,47 @@ public class CustomMapSerialiserTest extends ToBytesSerialisationTest<CustomMap>
         final CustomMap deserialise = serialiser.deserialise(serialiser.serialise(expected));
 
         // Then
-        detailedEquals(expected, deserialise, String.class, Integer.class, new StringSerialiser(), new IntegerSerialiser());
-    }
-
-    @Test
-    public void shouldSerialiserStringRBMBackedTimestampSet() throws SerialisationException {
-        // Given
-        final RBMBackedTimestampSet timestampSet1 = new RBMBackedTimestampSet.Builder()
-                .timeBucket(CommonTimeUtil.TimeBucket.MINUTE)
-                .timestamps(Lists.newArrayList(Instant.ofEpochSecond(10)))
-                .timestamps(Lists.newArrayList(Instant.ofEpochSecond(20)))
-                .build();
-
-        final RBMBackedTimestampSet timestampSet2 = new RBMBackedTimestampSet.Builder()
-                .timeBucket(CommonTimeUtil.TimeBucket.MINUTE)
-                .timestamps(Lists.newArrayList(Instant.ofEpochSecond(111)))
-                .timestamps(Lists.newArrayList(Instant.ofEpochSecond(222)))
-                .build();
-
-        final CustomMap<String, RBMBackedTimestampSet> expected = new CustomMap<>(new StringSerialiser(), new RBMBackedTimestampSetSerialiser());
-        expected.put("OneTimeStamp", timestampSet1);
-        expected.put("TwoTimeStamp", timestampSet2);
-
-        // When
-        final CustomMap deserialise = serialiser.deserialise(serialiser.serialise(expected));
-        // Then
-        detailedEquals(expected, deserialise, String.class, RBMBackedTimestampSet.class, new StringSerialiser(), new RBMBackedTimestampSetSerialiser());
-    }
-
-    private void detailedEquals(final CustomMap expected, final CustomMap actual, final Class expectedKClass, final Class expectedVClass, final ToBytesSerialiser kS, final ToBytesSerialiser vS) {
-        try {
-            assertEquals(expected, actual);
-        } catch (AssertionError e) {
-            //Serialiser
-            assertEquals(kS, expected.getKeySerialiser());
-            assertEquals(kS, actual.getKeySerialiser());
-            assertEquals(vS, expected.getValueSerialiser());
-            assertEquals(vS, actual.getValueSerialiser());
-            assertEquals(expected.getKeySerialiser(), actual.getKeySerialiser());
-            //Key element
-            assertEquals(expectedKClass, expected.keySet().iterator().next().getClass());
-            assertEquals(expectedKClass, actual.keySet().iterator().next().getClass());
-            //Value element
-            assertEquals(expectedVClass, expected.values().iterator().next().getClass());
-            assertEquals(expectedVClass, actual.values().iterator().next().getClass());
-            //ketSets
-            assertEquals(expected.keySet(), actual.keySet());
-            //values
-            for (Object k : expected.keySet()) {
-                final Object expectedV = expected.get(k);
-                final Object actualV = actual.get(k);
-                assertEquals(expectedV.getClass(), actualV.getClass());
-                assertEquals(expectedVClass, actualV.getClass());
-                assertEquals(expectedVClass, expectedV.getClass());
-                assertEquals(expectedV, actualV);
-            }
-            assertEquals(expected, actual);
+        if (deserialise.equals(expected)) {
+            return;
         }
+        detailedEquals(expected, deserialise, String.class, Integer.class, new StringSerialiser(), new OrderedIntegerSerialiser());
+    }
+
+    private void detailedEquals(final CustomMap<String, Integer> expected,
+                                final CustomMap actual,
+                                final Class<String> expectedKClass,
+                                final Class<Integer> expectedVClass,
+                                final ToBytesSerialiser<String> kS,
+                                final ToBytesSerialiser<Integer> vS) {
+
+        // Serialiser
+        assertThat(expected.getKeySerialiser()).isEqualTo(kS);
+        assertThat(actual.getKeySerialiser()).isEqualTo(kS);
+        assertThat(expected.getValueSerialiser()).isEqualTo(vS);
+        assertThat(actual.getValueSerialiser()).isEqualTo(vS);
+        assertThat(actual.getKeySerialiser()).isEqualTo(expected.getKeySerialiser());
+
+        // Key element
+        assertThat(expected.keySet().iterator().next().getClass()).isEqualTo(expectedKClass);
+        assertThat(actual.keySet().iterator().next().getClass()).isEqualTo(expectedKClass);
+
+        // Value element
+        assertThat(expected.values().iterator().next().getClass()).isEqualTo(expectedVClass);
+        assertThat(actual.values().iterator().next().getClass()).isEqualTo(expectedVClass);
+
+        // keySets
+        assertThat(actual.keySet()).isEqualTo(expected.keySet());
+
+        //values
+        for (Object k : expected.keySet()) {
+            final Object expectedV = expected.get(k);
+            final Object actualV = actual.get(k);
+            assertThat(actualV.getClass()).isEqualTo(expectedV.getClass());
+            assertThat(actualV.getClass()).isEqualTo(expectedVClass);
+            assertThat(expectedV.getClass()).isEqualTo(expectedVClass);
+            assertThat(actualV).isEqualTo(expectedV);
+        }
+        assertThat(actual).isEqualTo(expected);
     }
 
     @Override
@@ -111,15 +90,15 @@ public class CustomMapSerialiserTest extends ToBytesSerialisationTest<CustomMap>
 
     @Override
     public Pair<CustomMap, byte[]>[] getHistoricSerialisationPairs() {
-        final CustomMap<String, Integer> cm1 = new CustomMap(new StringSerialiser(), new IntegerSerialiser());
+        final CustomMap<String, Integer> cm1 = new CustomMap<>(new StringSerialiser(), new OrderedIntegerSerialiser());
         cm1.put("One", 1);
 
-        final CustomMap<Float, String> cm2 = new CustomMap<>(new RawFloatSerialiser(), new StringSerialiser());
+        final CustomMap<Float, String> cm2 = new CustomMap<>(new OrderedFloatSerialiser(), new StringSerialiser());
         cm2.put(3.1f, "three point 1");
 
         return new Pair[] {
-                new Pair(cm1, new byte[] {-84, -19, 0, 5, 115, 114, 0, 69, 117, 107, 46, 103, 111, 118, 46, 103, 99, 104, 113, 46, 103, 97, 102, 102, 101, 114, 46, 115, 101, 114, 105, 97, 108, 105, 115, 97, 116, 105, 111, 110, 46, 67, 117, 115, 116, 111, 109, 77, 97, 112, 83, 101, 114, 105, 97, 108, 105, 115, 101, 114, 36, 67, 117, 115, 116, 111, 109, 77, 97, 112, 73, 110, 116, 101, 114, 105, 109, 112, 50, 94, -101, 109, -71, 126, 20, 2, 0, 3, 91, 0, 7, 98, 121, 116, 101, 77, 97, 112, 116, 0, 2, 91, 66, 76, 0, 13, 107, 101, 121, 83, 101, 114, 105, 97, 108, 105, 115, 101, 114, 116, 0, 52, 76, 117, 107, 47, 103, 111, 118, 47, 103, 99, 104, 113, 47, 103, 97, 102, 102, 101, 114, 47, 115, 101, 114, 105, 97, 108, 105, 115, 97, 116, 105, 111, 110, 47, 84, 111, 66, 121, 116, 101, 115, 83, 101, 114, 105, 97, 108, 105, 115, 101, 114, 59, 76, 0, 15, 118, 97, 108, 117, 101, 83, 101, 114, 105, 97, 108, 105, 115, 101, 114, 113, 0, 126, 0, 2, 120, 112, 117, 114, 0, 2, 91, 66, -84, -13, 23, -8, 6, 8, 84, -32, 2, 0, 0, 120, 112, 0, 0, 0, 6, 3, 79, 110, 101, 1, 49, 115, 114, 0, 64, 117, 107, 46, 103, 111, 118, 46, 103, 99, 104, 113, 46, 103, 97, 102, 102, 101, 114, 46, 115, 101, 114, 105, 97, 108, 105, 115, 97, 116, 105, 111, 110, 46, 105, 109, 112, 108, 101, 109, 101, 110, 116, 97, 116, 105, 111, 110, 46, 83, 116, 114, 105, 110, 103, 83, 101, 114, 105, 97, 108, 105, 115, 101, 114, 78, 96, -36, -19, 29, -23, 32, -19, 2, 0, 0, 120, 114, 0, 61, 117, 107, 46, 103, 111, 118, 46, 103, 99, 104, 113, 46, 103, 97, 102, 102, 101, 114, 46, 115, 101, 114, 105, 97, 108, 105, 115, 97, 116, 105, 111, 110, 46, 84, 111, 66, 121, 116, 101, 115, 86, 105, 97, 83, 116, 114, 105, 110, 103, 68, 101, 115, 101, 114, 105, 97, 108, 105, 115, 101, 114, -88, 123, -44, -50, -55, 101, -92, 46, 2, 0, 1, 76, 0, 7, 99, 104, 97, 114, 115, 101, 116, 116, 0, 18, 76, 106, 97, 118, 97, 47, 108, 97, 110, 103, 47, 83, 116, 114, 105, 110, 103, 59, 120, 112, 116, 0, 5, 85, 84, 70, 45, 56, 115, 114, 0, 50, 117, 107, 46, 103, 111, 118, 46, 103, 99, 104, 113, 46, 103, 97, 102, 102, 101, 114, 46, 115, 101, 114, 105, 97, 108, 105, 115, 97, 116, 105, 111, 110, 46, 73, 110, 116, 101, 103, 101, 114, 83, 101, 114, 105, 97, 108, 105, 115, 101, 114, 78, 96, -36, -19, 29, -23, 32, -19, 2, 0, 0, 120, 113, 0, 126, 0, 7, 116, 0, 10, 73, 83, 79, 45, 56, 56, 53, 57, 45, 49}),
-                new Pair(cm2, new byte[] {-84, -19, 0, 5, 115, 114, 0, 69, 117, 107, 46, 103, 111, 118, 46, 103, 99, 104, 113, 46, 103, 97, 102, 102, 101, 114, 46, 115, 101, 114, 105, 97, 108, 105, 115, 97, 116, 105, 111, 110, 46, 67, 117, 115, 116, 111, 109, 77, 97, 112, 83, 101, 114, 105, 97, 108, 105, 115, 101, 114, 36, 67, 117, 115, 116, 111, 109, 77, 97, 112, 73, 110, 116, 101, 114, 105, 109, 112, 50, 94, -101, 109, -71, 126, 20, 2, 0, 3, 91, 0, 7, 98, 121, 116, 101, 77, 97, 112, 116, 0, 2, 91, 66, 76, 0, 13, 107, 101, 121, 83, 101, 114, 105, 97, 108, 105, 115, 101, 114, 116, 0, 52, 76, 117, 107, 47, 103, 111, 118, 47, 103, 99, 104, 113, 47, 103, 97, 102, 102, 101, 114, 47, 115, 101, 114, 105, 97, 108, 105, 115, 97, 116, 105, 111, 110, 47, 84, 111, 66, 121, 116, 101, 115, 83, 101, 114, 105, 97, 108, 105, 115, 101, 114, 59, 76, 0, 15, 118, 97, 108, 117, 101, 83, 101, 114, 105, 97, 108, 105, 115, 101, 114, 113, 0, 126, 0, 2, 120, 112, 117, 114, 0, 2, 91, 66, -84, -13, 23, -8, 6, 8, 84, -32, 2, 0, 0, 120, 112, 0, 0, 0, 19, 4, 102, 102, 70, 64, 13, 116, 104, 114, 101, 101, 32, 112, 111, 105, 110, 116, 32, 49, 115, 114, 0, 70, 117, 107, 46, 103, 111, 118, 46, 103, 99, 104, 113, 46, 103, 97, 102, 102, 101, 114, 46, 115, 101, 114, 105, 97, 108, 105, 115, 97, 116, 105, 111, 110, 46, 105, 109, 112, 108, 101, 109, 101, 110, 116, 97, 116, 105, 111, 110, 46, 114, 97, 119, 46, 82, 97, 119, 70, 108, 111, 97, 116, 83, 101, 114, 105, 97, 108, 105, 115, 101, 114, -119, 5, 40, -76, -66, -52, 123, 37, 2, 0, 0, 120, 112, 115, 114, 0, 64, 117, 107, 46, 103, 111, 118, 46, 103, 99, 104, 113, 46, 103, 97, 102, 102, 101, 114, 46, 115, 101, 114, 105, 97, 108, 105, 115, 97, 116, 105, 111, 110, 46, 105, 109, 112, 108, 101, 109, 101, 110, 116, 97, 116, 105, 111, 110, 46, 83, 116, 114, 105, 110, 103, 83, 101, 114, 105, 97, 108, 105, 115, 101, 114, 78, 96, -36, -19, 29, -23, 32, -19, 2, 0, 0, 120, 114, 0, 61, 117, 107, 46, 103, 111, 118, 46, 103, 99, 104, 113, 46, 103, 97, 102, 102, 101, 114, 46, 115, 101, 114, 105, 97, 108, 105, 115, 97, 116, 105, 111, 110, 46, 84, 111, 66, 121, 116, 101, 115, 86, 105, 97, 83, 116, 114, 105, 110, 103, 68, 101, 115, 101, 114, 105, 97, 108, 105, 115, 101, 114, -88, 123, -44, -50, -55, 101, -92, 46, 2, 0, 1, 76, 0, 7, 99, 104, 97, 114, 115, 101, 116, 116, 0, 18, 76, 106, 97, 118, 97, 47, 108, 97, 110, 103, 47, 83, 116, 114, 105, 110, 103, 59, 120, 112, 116, 0, 5, 85, 84, 70, 45, 56}),
+                new Pair(cm1, new byte[] {-84, -19, 0, 5, 115, 114, 0, 69, 117, 107, 46, 103, 111, 118, 46, 103, 99, 104, 113, 46, 103, 97, 102, 102, 101, 114, 46, 115, 101, 114, 105, 97, 108, 105, 115, 97, 116, 105, 111, 110, 46, 67, 117, 115, 116, 111, 109, 77, 97, 112, 83, 101, 114, 105, 97, 108, 105, 115, 101, 114, 36, 67, 117, 115, 116, 111, 109, 77, 97, 112, 73, 110, 116, 101, 114, 105, 109, 112, 50, 94, -101, 109, -71, 126, 20, 2, 0, 3, 91, 0, 7, 98, 121, 116, 101, 77, 97, 112, 116, 0, 2, 91, 66, 76, 0, 13, 107, 101, 121, 83, 101, 114, 105, 97, 108, 105, 115, 101, 114, 116, 0, 52, 76, 117, 107, 47, 103, 111, 118, 47, 103, 99, 104, 113, 47, 103, 97, 102, 102, 101, 114, 47, 115, 101, 114, 105, 97, 108, 105, 115, 97, 116, 105, 111, 110, 47, 84, 111, 66, 121, 116, 101, 115, 83, 101, 114, 105, 97, 108, 105, 115, 101, 114, 59, 76, 0, 15, 118, 97, 108, 117, 101, 83, 101, 114, 105, 97, 108, 105, 115, 101, 114, 113, 0, 126, 0, 2, 120, 112, 117, 114, 0, 2, 91, 66, -84, -13, 23, -8, 6, 8, 84, -32, 2, 0, 0, 120, 112, 0, 0, 0, 10, 3, 79, 110, 101, 5, 4, -128, 0, 0, 1, 115, 114, 0, 64, 117, 107, 46, 103, 111, 118, 46, 103, 99, 104, 113, 46, 103, 97, 102, 102, 101, 114, 46, 115, 101, 114, 105, 97, 108, 105, 115, 97, 116, 105, 111, 110, 46, 105, 109, 112, 108, 101, 109, 101, 110, 116, 97, 116, 105, 111, 110, 46, 83, 116, 114, 105, 110, 103, 83, 101, 114, 105, 97, 108, 105, 115, 101, 114, 78, 96, -36, -19, 29, -23, 32, -19, 2, 0, 0, 120, 114, 0, 61, 117, 107, 46, 103, 111, 118, 46, 103, 99, 104, 113, 46, 103, 97, 102, 102, 101, 114, 46, 115, 101, 114, 105, 97, 108, 105, 115, 97, 116, 105, 111, 110, 46, 84, 111, 66, 121, 116, 101, 115, 86, 105, 97, 83, 116, 114, 105, 110, 103, 68, 101, 115, 101, 114, 105, 97, 108, 105, 115, 101, 114, -88, 123, -44, -50, -55, 101, -92, 46, 2, 0, 1, 76, 0, 7, 99, 104, 97, 114, 115, 101, 116, 116, 0, 18, 76, 106, 97, 118, 97, 47, 108, 97, 110, 103, 47, 83, 116, 114, 105, 110, 103, 59, 120, 112, 116, 0, 5, 85, 84, 70, 45, 56, 115, 114, 0, 80, 117, 107, 46, 103, 111, 118, 46, 103, 99, 104, 113, 46, 103, 97, 102, 102, 101, 114, 46, 115, 101, 114, 105, 97, 108, 105, 115, 97, 116, 105, 111, 110, 46, 105, 109, 112, 108, 101, 109, 101, 110, 116, 97, 116, 105, 111, 110, 46, 111, 114, 100, 101, 114, 101, 100, 46, 79, 114, 100, 101, 114, 101, 100, 73, 110, 116, 101, 103, 101, 114, 83, 101, 114, 105, 97, 108, 105, 115, 101, 114, 78, -75, -61, 54, -72, 114, -23, -42, 2, 0, 0, 120, 112}),
+                new Pair(cm2, new byte[] {-84, -19, 0, 5, 115, 114, 0, 69, 117, 107, 46, 103, 111, 118, 46, 103, 99, 104, 113, 46, 103, 97, 102, 102, 101, 114, 46, 115, 101, 114, 105, 97, 108, 105, 115, 97, 116, 105, 111, 110, 46, 67, 117, 115, 116, 111, 109, 77, 97, 112, 83, 101, 114, 105, 97, 108, 105, 115, 101, 114, 36, 67, 117, 115, 116, 111, 109, 77, 97, 112, 73, 110, 116, 101, 114, 105, 109, 112, 50, 94, -101, 109, -71, 126, 20, 2, 0, 3, 91, 0, 7, 98, 121, 116, 101, 77, 97, 112, 116, 0, 2, 91, 66, 76, 0, 13, 107, 101, 121, 83, 101, 114, 105, 97, 108, 105, 115, 101, 114, 116, 0, 52, 76, 117, 107, 47, 103, 111, 118, 47, 103, 99, 104, 113, 47, 103, 97, 102, 102, 101, 114, 47, 115, 101, 114, 105, 97, 108, 105, 115, 97, 116, 105, 111, 110, 47, 84, 111, 66, 121, 116, 101, 115, 83, 101, 114, 105, 97, 108, 105, 115, 101, 114, 59, 76, 0, 15, 118, 97, 108, 117, 101, 83, 101, 114, 105, 97, 108, 105, 115, 101, 114, 113, 0, 126, 0, 2, 120, 112, 117, 114, 0, 2, 91, 66, -84, -13, 23, -8, 6, 8, 84, -32, 2, 0, 0, 120, 112, 0, 0, 0, 20, 5, 4, 64, 70, 102, 102, 13, 116, 104, 114, 101, 101, 32, 112, 111, 105, 110, 116, 32, 49, 115, 114, 0, 78, 117, 107, 46, 103, 111, 118, 46, 103, 99, 104, 113, 46, 103, 97, 102, 102, 101, 114, 46, 115, 101, 114, 105, 97, 108, 105, 115, 97, 116, 105, 111, 110, 46, 105, 109, 112, 108, 101, 109, 101, 110, 116, 97, 116, 105, 111, 110, 46, 111, 114, 100, 101, 114, 101, 100, 46, 79, 114, 100, 101, 114, 101, 100, 70, 108, 111, 97, 116, 83, 101, 114, 105, 97, 108, 105, 115, 101, 114, 94, -57, -120, -117, -127, 8, 64, 109, 2, 0, 0, 120, 112, 115, 114, 0, 64, 117, 107, 46, 103, 111, 118, 46, 103, 99, 104, 113, 46, 103, 97, 102, 102, 101, 114, 46, 115, 101, 114, 105, 97, 108, 105, 115, 97, 116, 105, 111, 110, 46, 105, 109, 112, 108, 101, 109, 101, 110, 116, 97, 116, 105, 111, 110, 46, 83, 116, 114, 105, 110, 103, 83, 101, 114, 105, 97, 108, 105, 115, 101, 114, 78, 96, -36, -19, 29, -23, 32, -19, 2, 0, 0, 120, 114, 0, 61, 117, 107, 46, 103, 111, 118, 46, 103, 99, 104, 113, 46, 103, 97, 102, 102, 101, 114, 46, 115, 101, 114, 105, 97, 108, 105, 115, 97, 116, 105, 111, 110, 46, 84, 111, 66, 121, 116, 101, 115, 86, 105, 97, 83, 116, 114, 105, 110, 103, 68, 101, 115, 101, 114, 105, 97, 108, 105, 115, 101, 114, -88, 123, -44, -50, -55, 101, -92, 46, 2, 0, 1, 76, 0, 7, 99, 104, 97, 114, 115, 101, 116, 116, 0, 18, 76, 106, 97, 118, 97, 47, 108, 97, 110, 103, 47, 83, 116, 114, 105, 110, 103, 59, 120, 112, 116, 0, 5, 85, 84, 70, 45, 56}),
         };
     }
 }

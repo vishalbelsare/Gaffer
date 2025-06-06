@@ -1,5 +1,5 @@
 /*
- * Copyright 2016-2020 Crown Copyright
+ * Copyright 2016-2024 Crown Copyright
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,15 +27,19 @@ import org.apache.accumulo.core.client.NamespaceExistsException;
 import org.apache.accumulo.core.client.TableExistsException;
 import org.apache.accumulo.core.client.TableNotFoundException;
 import org.apache.accumulo.core.client.ZooKeeperInstance;
+import org.apache.accumulo.core.client.security.tokens.KerberosToken;
 import org.apache.accumulo.core.client.security.tokens.PasswordToken;
 import org.apache.accumulo.core.conf.Property;
 import org.apache.accumulo.core.iterators.IteratorUtil.IteratorScope;
 import org.apache.accumulo.core.security.Authorizations;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.Text;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import uk.gov.gchq.gaffer.accumulostore.AccumuloProperties;
 import uk.gov.gchq.gaffer.accumulostore.AccumuloStore;
 import uk.gov.gchq.gaffer.accumulostore.key.AccumuloRuntimeException;
 import uk.gov.gchq.gaffer.accumulostore.key.core.impl.CoreKeyBloomFunctor;
@@ -43,6 +47,7 @@ import uk.gov.gchq.gaffer.accumulostore.key.exception.IteratorSettingException;
 import uk.gov.gchq.gaffer.store.StoreException;
 import uk.gov.gchq.koryphe.ValidationResult;
 
+import java.time.LocalDateTime;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -57,6 +62,7 @@ import java.util.concurrent.TimeUnit;
 public final class TableUtils {
     private static final Logger LOGGER = LoggerFactory.getLogger(TableUtils.class);
     public static final String COLUMN_FAMILIES_OPTION = "columns";
+    private static Boolean initialKerberosLoginComplete = false;
 
     private TableUtils() {
     }
@@ -110,16 +116,14 @@ public final class TableUtils {
         }
         try {
             final String namespace = store.getProperties().getNamespace();
-            if (StringUtils.isNotBlank(namespace)) {
-                if (!connector.namespaceOperations().exists(namespace)) {
-                    LOGGER.info("Creating namespace {} as user {}", namespace, connector.whoami());
-                    try {
-                        connector.namespaceOperations().create(namespace);
-                    } catch (final NamespaceExistsException e) {
-                        // This method is synchronised, if you are using the same store only
-                        // through one client in one JVM you shouldn't get here
-                        // Someone else got there first, never mind...
-                    }
+            if (StringUtils.isNotBlank(namespace) && !connector.namespaceOperations().exists(namespace)) {
+                LOGGER.info("Creating namespace {} as user {}", namespace, connector.whoami());
+                try {
+                    connector.namespaceOperations().create(namespace);
+                } catch (final NamespaceExistsException e) {
+                    // This method is synchronised, if you are using the same store only
+                    // through one client in one JVM you shouldn't get here
+                    // Someone else got there first, never mind...
                 }
             }
             LOGGER.info("Creating table {} as user {}", tableName, connector.whoami());
@@ -135,6 +139,10 @@ public final class TableUtils {
             connector.tableOperations().setProperty(tableName, Property.TABLE_BLOOM_ENABLED.getKey(), "true");
             connector.tableOperations().setProperty(tableName, Property.TABLE_BLOOM_KEY_FUNCTOR.getKey(),
                     store.getKeyPackage().getKeyFunctor().getClass().getName());
+
+            //  Set table creation timestamp
+            LOGGER.info("Storing creation timestamp for table {}", tableName);
+            connector.tableOperations().setProperty(tableName, AccumuloProperties.TABLE_CREATED_TIME, LocalDateTime.now().toString());
 
             // Remove versioning iterator from table for all scopes
             LOGGER.info("Removing versioning iterator from table {}", tableName);
@@ -200,8 +208,8 @@ public final class TableUtils {
     }
 
     /**
-     * Creates a connection to an accumulo instance using the provided
-     * parameters
+     * Creates a connection (using password-based authentication) to
+     * an accumulo instance using the provided parameters
      *
      * @param instanceName the instance name
      * @param zookeepers   the zoo keepers
@@ -216,7 +224,105 @@ public final class TableUtils {
         try {
             return instance.getConnector(userName, new PasswordToken(password));
         } catch (final AccumuloException | AccumuloSecurityException e) {
-            throw new StoreException("Failed to create accumulo connection", e);
+            throw new StoreException("Failed to create accumulo connection (using password-based authentication)", e);
+        }
+    }
+
+    /**
+     * Creates a connection (using Kerberos authentication) to
+     * an accumulo instance using the provided parameters
+     *
+     * @param instanceName the instance name
+     * @param zookeepers   the zoo keepers
+     * @param principal    the Kerberos principal
+     * @param keytabPath   the path to the Kerberos keytab
+     * @return A connection to an accumulo instance
+     * @throws StoreException failure to create an accumulo connection
+     */
+    public static Connector getConnectorKerberos(final String instanceName, final String zookeepers,
+                                                 final String principal, final String keytabPath) throws StoreException {
+        final Instance instance = new ZooKeeperInstance(instanceName, zookeepers);
+        try {
+            // Configure Hadoop UGI to use Kerberos (if it's not already)
+            if (!UserGroupInformation.isSecurityEnabled()) {
+                Configuration conf = new Configuration();
+                conf.set("hadoop.security.authentication", "kerberos");
+                conf.set("hadoop.security.authorization", "true");
+                UserGroupInformation.setConfiguration(conf);
+            }
+            // If initial login is complete and logged in using Keytab, then check if ticket needs renewal, else do initial login
+            if (initialKerberosLoginComplete && UserGroupInformation.isLoginKeytabBased()) {
+                UserGroupInformation.getCurrentUser().checkTGTAndReloginFromKeytab();
+                LOGGER.debug("Already logged into Kerberos, TGT rechecked for principal '{}'", UserGroupInformation.getCurrentUser().getUserName());
+            } else {
+                LOGGER.info("Attempting Kerberos login with principal '{}' & keytab path '{}'", principal, keytabPath);
+                UserGroupInformation.loginUserFromKeytab(principal, keytabPath);
+                initialKerberosLoginComplete = true;
+            }
+            KerberosToken token = new KerberosToken();
+            Connector conn = instance.getConnector(token.getPrincipal(), token);
+            return conn;
+        } catch (final Exception e) {
+            throw new StoreException("Failed to create accumulo connection (using Kerberos authentication)", e);
+        }
+    }
+
+    /**
+     * Creates a connection to an accumulo instance using parameters
+     * from the provided {@link AccumuloProperties}.
+     *
+     * @param accumuloProperties the configuration properties
+     * @return A connection to an accumulo instance
+     * @throws StoreException failure to create an accumulo connection
+     */
+    public static Connector getConnector(final AccumuloProperties accumuloProperties) throws StoreException {
+        if (accumuloProperties.getEnableKerberos()) {
+            return getConnectorKerberos(accumuloProperties.getInstance(), accumuloProperties.getZookeepers(),
+                    accumuloProperties.getPrincipal(), accumuloProperties.getKeytabPath());
+        } else {
+            return getConnector(accumuloProperties.getInstance(), accumuloProperties.getZookeepers(),
+                    accumuloProperties.getUser(), accumuloProperties.getPassword());
+        }
+    }
+
+    /**
+     * Gets the name of an Accumulo table
+     *
+     * @param accumuloProperties An {@link AccumuloProperties} potentially containing namespace information
+     * @param graphId Graph ID
+     * @return Accumulo Table Name derived from the parameters
+     */
+    public static String getTableName(final AccumuloProperties accumuloProperties, final String graphId) {
+        if (StringUtils.isNotBlank(accumuloProperties.getNamespace())) {
+            return String.format("%s.%s", accumuloProperties.getNamespace(), graphId);
+        }
+        return graphId;
+    }
+
+    /**
+     * Renames the Accumulo table (if it exists) that
+     * is associated with the provided parameters.
+     * <p>
+     * This will not modify any table namespace component
+     * of an Accumulo table name.
+     *
+     * @param accumuloProperties {@link AccumuloProperties} for the graph
+     * @param currentGraphId Current graph ID to rename from
+     * @param newGraphId New graph ID to rename to
+     * @throws StoreException failure to rename Accumulo table
+     */
+    public static void renameTable(final AccumuloProperties accumuloProperties, final String currentGraphId, final String newGraphId) throws StoreException {
+        final String currentTableName = getTableName(accumuloProperties, currentGraphId);
+        final String newTableName = getTableName(accumuloProperties, newGraphId);
+        try {
+            final Connector connector = getConnector(accumuloProperties);
+            if (connector.tableOperations().exists(currentTableName)) {
+                connector.tableOperations().offline(currentTableName);
+                connector.tableOperations().rename(currentTableName, newTableName);
+                connector.tableOperations().online(newTableName);
+            }
+        } catch (final AccumuloException | AccumuloSecurityException | TableNotFoundException | TableExistsException e) {
+            throw new StoreException(e.getMessage(), e);
         }
     }
 
@@ -231,7 +337,7 @@ public final class TableUtils {
     public static Authorizations getCurrentAuthorizations(final Connector connection) throws StoreException {
         try {
             return connection.securityOperations().getUserAuthorizations(connection.whoami());
-        } catch (final AccumuloException | AccumuloSecurityException e) {
+        } catch (final Exception e) {
             throw new StoreException(e.getMessage(), e);
         }
     }
@@ -334,14 +440,11 @@ public final class TableUtils {
         boolean bloomFilterEnabled = false;
         String bloomKeyFunctor = null;
         for (final Map.Entry<String, String> tableProp : tableProps) {
-            if (Property.TABLE_BLOOM_ENABLED.getKey().equals(tableProp.getKey())) {
-                if (Boolean.parseBoolean(tableProp.getValue())) {
-                    bloomFilterEnabled = true;
-                }
-            } else if (Property.TABLE_BLOOM_KEY_FUNCTOR.getKey().equals(tableProp.getKey())) {
-                if (null == bloomKeyFunctor || CoreKeyBloomFunctor.class.getName().equals(tableProp.getValue())) {
-                    bloomKeyFunctor = tableProp.getValue();
-                }
+            if (Property.TABLE_BLOOM_ENABLED.getKey().equals(tableProp.getKey()) && Boolean.parseBoolean(tableProp.getValue())) {
+                bloomFilterEnabled = true;
+            } else if (Property.TABLE_BLOOM_KEY_FUNCTOR.getKey().equals(tableProp.getKey())
+                    && (bloomKeyFunctor == null || CoreKeyBloomFunctor.class.getName().equals(tableProp.getValue()))) {
+                bloomKeyFunctor = tableProp.getValue();
             }
         }
 

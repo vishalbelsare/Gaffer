@@ -1,5 +1,5 @@
 /*
- * Copyright 2016-2020 Crown Copyright
+ * Copyright 2016-2023 Crown Copyright
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,27 +13,26 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package uk.gov.gchq.gaffer.jobtracker;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
 
-import uk.gov.gchq.gaffer.commonutil.CommonConstants;
 import uk.gov.gchq.gaffer.commonutil.ToStringBuilder;
 import uk.gov.gchq.gaffer.jsonserialisation.JSONSerialiser;
 import uk.gov.gchq.gaffer.operation.OperationChain;
 import uk.gov.gchq.gaffer.user.User;
 
 import java.io.Serializable;
-import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 
 /**
  * POJO containing details of a Gaffer job.
  */
 public class JobDetail implements Serializable {
     private static final long serialVersionUID = -1677432285205724269L;
-    private static final String CHARSET_NAME = CommonConstants.UTF_8;
     private String parentJobId;
     private Repeat repeat;
     private String jobId;
@@ -66,23 +65,8 @@ public class JobDetail implements Serializable {
         }
     }
 
-    @Deprecated
-    public JobDetail(final String jobId, final String userId, final OperationChain<?> opChain, final JobStatus jobStatus, final String description) {
-        this(jobId, null, userId, opChain, jobStatus, description);
-    }
-
     public JobDetail(final String jobId, final User user, final OperationChain<?> opChain, final JobStatus jobStatus, final String description) {
         this(jobId, null, user, opChain, jobStatus, description);
-    }
-
-    @Deprecated
-    public JobDetail(final String jobId, final String userId, final String opChain, final JobStatus jobStatus, final String description) {
-        this(jobId, null, userId, opChain, jobStatus, description);
-    }
-
-    @Deprecated
-    public JobDetail(final String jobId, final String parentJobId, final String userId, final OperationChain<?> opChain, final JobStatus jobStatus, final String description) {
-        this(jobId, parentJobId, new User(userId), opChain, jobStatus, description);
     }
 
     public JobDetail(final String jobId, final String parentJobId, final User user, final OperationChain<?> opChain, final JobStatus jobStatus, final String description) {
@@ -95,11 +79,6 @@ public class JobDetail implements Serializable {
         this.description = description;
     }
 
-    @Deprecated
-    public JobDetail(final String jobId, final String parentJobId, final String userId, final String opChain, final JobStatus jobStatus, final String description) {
-        this(jobId, parentJobId, new User(userId), opChain, jobStatus, description);
-    }
-
     public JobDetail(final String jobId, final String parentJobId, final User user, final String opChain, final JobStatus jobStatus, final String description) {
         setOpChain(opChain);
         this.jobId = jobId;
@@ -108,12 +87,6 @@ public class JobDetail implements Serializable {
         this.status = jobStatus;
         this.description = description;
         this.parentJobId = parentJobId;
-    }
-
-    @Deprecated
-    public JobDetail(final String jobId, final String parentJobId, final String userId, final String opChain, final JobStatus jobStatus, final String description, final Repeat repeat) {
-        this(jobId, parentJobId, userId, opChain, jobStatus, description);
-        this.repeat = repeat;
     }
 
     public JobDetail(final String jobId, final String parentJobId, final User user, final String opChain, final String serialisedOperationChain, final JobStatus jobStatus, final String description, final Repeat repeat) {
@@ -136,18 +109,6 @@ public class JobDetail implements Serializable {
 
     public void setUser(final User user) {
         this.user = user;
-    }
-
-    @Deprecated
-    @JsonIgnore
-    public String getUserId() {
-        return user != null ? user.getUserId() : null;
-    }
-
-    @Deprecated
-    @JsonIgnore
-    public void setUserId(final String userId) {
-        this.user = new User(userId);
     }
 
     public JobStatus getStatus() {
@@ -308,12 +269,6 @@ public class JobDetail implements Serializable {
             return this;
         }
 
-        @Deprecated
-        public Builder userId(final String userId) {
-            this.user = new User(userId);
-            return this;
-        }
-
         public Builder status(final JobStatus status) {
             this.status = status;
             return this;
@@ -352,18 +307,14 @@ public class JobDetail implements Serializable {
     }
 
     private static String serialiseOperationChain(final OperationChain operationChain) {
-
         if (operationChain == null) {
             return "";
         }
 
         try {
-
-            return new String(JSONSerialiser.serialise(operationChain), Charset.forName(CHARSET_NAME));
-
+            return new String(JSONSerialiser.serialise(operationChain), StandardCharsets.UTF_8);
         } catch (final Exception exception) {
-
-            throw new IllegalArgumentException(exception.getMessage());
+            throw new IllegalArgumentException(exception.getMessage(), exception);
         }
     }
 }

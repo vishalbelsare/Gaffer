@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 Crown Copyright
+ * Copyright 2017-2024 Crown Copyright
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,14 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package uk.gov.gchq.gaffer.commonutil.iterable;
 
 import com.google.common.collect.Iterables;
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
 
+import uk.gov.gchq.gaffer.commonutil.CloseableUtil;
 import uk.gov.gchq.gaffer.commonutil.OneOrMore;
 import uk.gov.gchq.gaffer.commonutil.ToStringBuilder;
+import uk.gov.gchq.koryphe.iterable.ChainedIterable;
 
 import java.util.Collections;
 import java.util.Comparator;
@@ -28,9 +32,12 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.TreeMap;
 
+import static java.util.Objects.isNull;
+import static java.util.Objects.nonNull;
+
 /**
  * <p>
- * An {@link Iterable} which can sort, limit and deduplicate its elements.
+ * An {@link java.lang.Iterable} which can sort, limit and deduplicate its elements.
  * Sorting is achieved with a provided {@link Comparator}.
  * </p>
  * <p>
@@ -45,6 +52,7 @@ import java.util.TreeMap;
  * @param <E> the type of object to store in the {@link LimitedInMemorySortedIterable}.
  */
 public class LimitedInMemorySortedIterable<E> implements Iterable<E> {
+
     private final Comparator<E> comparator;
     private final boolean deduplicate;
     private final Integer limit;
@@ -60,10 +68,10 @@ public class LimitedInMemorySortedIterable<E> implements Iterable<E> {
     }
 
     public LimitedInMemorySortedIterable(final Comparator<E> comparator, final Integer limit, final boolean deduplicate) {
-        if (null == comparator) {
+        if (isNull(comparator)) {
             throw new IllegalArgumentException("Comparator is required");
         }
-        if (null != limit && 1 > limit) {
+        if (nonNull(limit) && 1 > limit) {
             throw new IllegalArgumentException("Limit cannot be less than or equal to 0");
         }
 
@@ -78,20 +86,28 @@ public class LimitedInMemorySortedIterable<E> implements Iterable<E> {
         boolean result = false;
 
         final OneOrMore<E> values = backingMap.get(e);
-        // Skip the item if we are deduplicating and the item already exists
-        boolean skipItem = (deduplicate && null != values && values.contains(e));
+        // Skip the item if we are deduplicating and the item already exists.
+        boolean skipItem = (deduplicate && nonNull(values) && values.contains(e));
         if (!skipItem) {
-            if (null != limit && size >= limit) {
+            if (nonNull(limit) && size >= limit) {
                 // Check the item against the last item.
                 final Map.Entry<E, OneOrMore<E>> last = backingMap.lastEntry();
+                // Checks if the last items key is greater than e
                 if (0 < comparator.compare(last.getKey(), e)) {
+                    // Checks if the items value contains a collection or a single item
                     if (1 < last.getValue().size()) {
+                        // Items value contains a collection.
+                        // Remove item from collection.
                         last.getValue().removeAnyItem();
                     } else {
+                        // Items value contains a single item.
+                        // Remove item from backingMap.
                         backingMap.remove(last.getKey());
                     }
                     size--;
+                    // e is bigger than the lastEntry.
                 } else {
+                    // Skip adding the item.
                     skipItem = true;
                 }
             }
@@ -126,17 +142,25 @@ public class LimitedInMemorySortedIterable<E> implements Iterable<E> {
     }
 
     @Override
+    @SuppressWarnings("PMD.UseTryWithResources")
     public Iterator<E> iterator() {
         if (backingMap.isEmpty()) {
             return Collections.emptyIterator();
         }
 
-        final Iterable[] values = Iterables.toArray(backingMap.values(), Iterable.class);
-        if (0 == values.length) {
+        @SuppressWarnings("unchecked")
+        final Iterable<? extends E>[] values = Iterables.toArray(backingMap.values(), Iterable.class);
+        if (ArrayUtils.isEmpty(values)) {
             return Collections.emptyIterator();
+        } else {
+            ChainedIterable<E> iterable = null;
+            try {
+                iterable = new ChainedIterable<E>(values);
+                return iterable.iterator();
+            } finally {
+                CloseableUtil.close(iterable);
+            }
         }
-
-        return new ChainedIterable<E>(values).iterator();
     }
 
     @Override
@@ -145,7 +169,7 @@ public class LimitedInMemorySortedIterable<E> implements Iterable<E> {
             return true;
         }
 
-        if (null == obj || getClass() != obj.getClass()) {
+        if (isNull(obj) || getClass() != obj.getClass()) {
             return false;
         }
 

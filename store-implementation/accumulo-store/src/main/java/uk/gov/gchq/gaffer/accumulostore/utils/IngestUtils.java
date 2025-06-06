@@ -1,5 +1,5 @@
 /*
- * Copyright 2016-2020 Crown Copyright
+ * Copyright 2016-2023 Crown Copyright
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package uk.gov.gchq.gaffer.accumulostore.utils;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
@@ -20,7 +21,6 @@ import org.apache.accumulo.core.client.AccumuloException;
 import org.apache.accumulo.core.client.AccumuloSecurityException;
 import org.apache.accumulo.core.client.Connector;
 import org.apache.accumulo.core.client.TableNotFoundException;
-import org.apache.accumulo.core.client.mock.MockConnector;
 import org.apache.commons.codec.binary.Base64;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileStatus;
@@ -32,15 +32,14 @@ import org.apache.hadoop.io.Text;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import uk.gov.gchq.gaffer.commonutil.CommonConstants;
 
 import java.io.BufferedOutputStream;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintStream;
+import java.nio.charset.StandardCharsets;
 import java.util.Collection;
-import java.util.TreeSet;
 
 /**
  * Utility methods for adding data to Accumulo.
@@ -79,33 +78,10 @@ public final class IngestUtils {
         } catch (final TableNotFoundException | AccumuloSecurityException | AccumuloException e) {
             throw new IOException(e.getMessage(), e);
         }
-        // This should have returned at most maxSplits splits, but this is not implemented properly in MockInstance.
-        if (splits.size() > maxSplits) {
-            if (conn instanceof MockConnector) {
-                LOGGER.info("Manually reducing the number of splits to {} due to MockInstance not implementing"
-                        + " listSplits(table, maxSplits) properly", maxSplits);
-            } else {
-                LOGGER.info("Manually reducing the number of splits to {} (number of splits was {})", maxSplits, splits.size());
-            }
-            final Collection<Text> filteredSplits = new TreeSet<>();
-            final int outputEveryNth = splits.size() / maxSplits;
-            LOGGER.info("Outputting every {}-th split from {} total", outputEveryNth, splits.size());
-            int i = 0;
-            for (final Text text : splits) {
-                if (i % outputEveryNth == 0) {
-                    filteredSplits.add(text);
-                }
-                i++;
-                if (filteredSplits.size() >= maxSplits) {
-                    break;
-                }
-            }
-            splits = filteredSplits;
-        }
         LOGGER.info("Found {} splits from table {}", splits.size(), table);
 
         try (final PrintStream out = new PrintStream(new BufferedOutputStream(fs.create(splitsFile, true)), false,
-                CommonConstants.UTF_8)) {
+                StandardCharsets.UTF_8.name())) {
             // Write the splits to file
             if (splits.isEmpty()) {
                 out.close();
@@ -113,7 +89,7 @@ public final class IngestUtils {
             }
 
             for (final Text split : splits) {
-                out.println(new String(Base64.encodeBase64(split.getBytes()), CommonConstants.UTF_8));
+                out.println(new String(Base64.encodeBase64(split.getBytes()), StandardCharsets.UTF_8));
             }
         }
         return splits.size();
@@ -136,7 +112,7 @@ public final class IngestUtils {
     public static int getNumSplits(final FileSystem fs, final Path splitsFile) throws IOException {
         int numSplits = 0;
         try (final FSDataInputStream fis = fs.open(splitsFile);
-             final InputStreamReader streamReader = new InputStreamReader(fis, CommonConstants.UTF_8);
+             final InputStreamReader streamReader = new InputStreamReader(fis, StandardCharsets.UTF_8);
              final BufferedReader reader = new BufferedReader(streamReader)) {
             while (null != reader.readLine()) {
                 ++numSplits;

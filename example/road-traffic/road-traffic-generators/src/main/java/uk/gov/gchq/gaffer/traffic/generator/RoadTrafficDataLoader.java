@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 Crown Copyright
+ * Copyright 2017-2023 Crown Copyright
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -33,18 +33,14 @@ import uk.gov.gchq.gaffer.store.schema.Schema;
 import uk.gov.gchq.gaffer.user.User;
 
 import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileReader;
 import java.io.IOException;
 import java.io.Reader;
 import java.io.StringReader;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.util.function.Supplier;
-import java.util.logging.Logger;
 
 public class RoadTrafficDataLoader {
-
-    private static final Logger LOGGER = Logger.getLogger(RoadTrafficDataLoader.class.getName());
-
     private final Graph graph;
     private final User user;
 
@@ -60,13 +56,14 @@ public class RoadTrafficDataLoader {
     public void load(final File dataFile) throws IOException, OperationException {
         load(() -> {
             try {
-                return new FileReader(dataFile);
-            } catch (final FileNotFoundException e) {
-                throw new RuntimeException("Unable to load data from file: " + dataFile.getPath());
+                return Files.newBufferedReader(dataFile.toPath(), StandardCharsets.UTF_8);
+            } catch (final IOException e) {
+                throw new RuntimeException("Unable to load data from file: " + dataFile.getPath(), e);
             }
         });
     }
 
+    @SuppressWarnings("PMD.UseTryWithResources")
     public void load(final Supplier<Reader> readerSupplier) throws OperationException, IOException {
         final SuppliedIterable<CSVRecord> csvIterable = new SuppliedIterable<>(() -> {
             try {
@@ -91,6 +88,7 @@ public class RoadTrafficDataLoader {
         }
     }
 
+    @SuppressWarnings("PMD.SystemPrintln") //Ok for main function
     public static void main(final String[] args) {
         if (args.length != 4) {
             System.err.println("Usage: " + RoadTrafficDataLoader.class.getSimpleName() + " <graphConfigFile> <schemaDir> <storePropsFile> <roadTrafficDataFile.csv>");
@@ -116,12 +114,12 @@ public class RoadTrafficDataLoader {
 
         final RoadTrafficDataLoader dataLoader = new RoadTrafficDataLoader(graph, user);
 
-        LOGGER.info("Loading data");
+        System.out.println("Loading data");
         try {
             dataLoader.load(new File(dataFile));
-            LOGGER.info("Data has been loaded");
+            System.out.println("Data has been loaded");
         } catch (final Exception e) {
-            LOGGER.info("Unable to load data: " + e.getMessage());
+            System.err.println("Unable to load data: " + e.getMessage());
             throw new RuntimeException("Unable to load data", e);
         }
     }

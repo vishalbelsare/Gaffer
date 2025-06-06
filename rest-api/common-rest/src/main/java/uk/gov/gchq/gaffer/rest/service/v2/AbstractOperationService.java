@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 Crown Copyright
+ * Copyright 2020-2025 Crown Copyright
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,7 +17,6 @@
 package uk.gov.gchq.gaffer.rest.service.v2;
 
 import uk.gov.gchq.gaffer.commonutil.CloseableUtil;
-import uk.gov.gchq.gaffer.commonutil.pair.Pair;
 import uk.gov.gchq.gaffer.core.exception.GafferRuntimeException;
 import uk.gov.gchq.gaffer.core.exception.Status;
 import uk.gov.gchq.gaffer.graph.GraphRequest;
@@ -31,15 +30,17 @@ import uk.gov.gchq.gaffer.rest.factory.UserFactory;
 import uk.gov.gchq.gaffer.rest.model.OperationDetail;
 import uk.gov.gchq.gaffer.store.Context;
 import uk.gov.gchq.koryphe.serialisation.json.SimpleClassNameIdResolver;
+import uk.gov.gchq.koryphe.util.ReflectionUtil;
 
 import java.util.HashSet;
 import java.util.Set;
 
 /**
- * An abstract OperationsService which allows for implementations to ingect dependencies
+ * An abstract OperationsService which allows for implementations to inject dependencies
  * depending on what DI framework they prefer. This abstraction allows Spring and Jersey
  * implementations share the same code
  */
+@SuppressWarnings("PMD.EmptyMethodInAbstractClassShouldBeAbstract") //Class is not particularly abstract
 public abstract class AbstractOperationService {
 
     protected abstract UserFactory getUserFactory();
@@ -49,14 +50,33 @@ public abstract class AbstractOperationService {
     protected abstract GraphFactory getGraphFactory();
 
     public Set<Class <? extends Operation>> getSupportedOperations() {
-        return getGraphFactory().getGraph().getSupportedOperations();
+        return getSupportedOperations(false);
+    }
+
+    public Set<Class<? extends Operation>> getSupportedOperations(final boolean includeUnsupported) {
+        Set<Class<? extends Operation>> operationsClasses;
+        if (includeUnsupported) {
+            operationsClasses = new HashSet(ReflectionUtil.getSubTypes(Operation.class));
+        } else {
+            operationsClasses = getGraphFactory().getGraph().getSupportedOperations();
+        }
+        return operationsClasses;
     }
 
     public Set<OperationDetail> getSupportedOperationDetails() {
-        Set<Class<? extends Operation>> supportedOperationClasses = getSupportedOperations();
+        return getSupportedOperationDetails(false);
+    }
+
+    public Set<OperationDetail> getSupportedOperationDetails(final boolean includeUnsupported) {
+        Set<Class<? extends Operation>> operationClasses;
+        if (includeUnsupported) {
+            operationClasses = new HashSet(ReflectionUtil.getSubTypes(Operation.class));
+        } else {
+            operationClasses = getSupportedOperations();
+        }
         Set<OperationDetail> operationDetails = new HashSet<>();
 
-        for (final Class<? extends Operation> clazz : supportedOperationClasses) {
+        for (final Class<? extends Operation> clazz : operationClasses) {
             try {
                 operationDetails.add(new OperationDetail(clazz, getNextOperations(clazz), generateExampleJson(clazz)));
             } catch (final IllegalAccessException | InstantiationException e) {
@@ -75,8 +95,8 @@ public abstract class AbstractOperationService {
         // no action by default
     }
 
-    @SuppressWarnings("ThrowFromFinallyBlock")
-    protected <O> Pair<O, String> _execute(final Operation operation, final Context context) {
+    @SuppressWarnings({"ThrowFromFinallyBlock", "PMD.UseTryWithResources"})
+    protected <O> O _execute(final Operation operation, final Context context) {
 
         OperationChain<O> opChain = (OperationChain<O>) OperationChain.wrap(operation);
 
@@ -98,7 +118,7 @@ public abstract class AbstractOperationService {
             }
         }
 
-        return new Pair<>(result.getResult(), result.getContext().getJobId());
+        return result.getResult();
     }
 
     protected Operation generateExampleJson(final Class<? extends Operation> opClass) throws IllegalAccessException, InstantiationException {

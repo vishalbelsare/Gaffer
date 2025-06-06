@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 Crown Copyright
+ * Copyright 2017-2024 Crown Copyright
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,12 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package uk.gov.gchq.gaffer.mapstore.impl;
 
 import org.junit.jupiter.api.Test;
 
 import uk.gov.gchq.gaffer.commonutil.StreamUtil;
-import uk.gov.gchq.gaffer.commonutil.iterable.CloseableIterable;
 import uk.gov.gchq.gaffer.commonutil.stream.Streams;
 import uk.gov.gchq.gaffer.data.element.Edge;
 import uk.gov.gchq.gaffer.data.element.Element;
@@ -33,7 +33,6 @@ import uk.gov.gchq.gaffer.operation.data.EntitySeed;
 import uk.gov.gchq.gaffer.operation.impl.add.AddElements;
 import uk.gov.gchq.gaffer.operation.impl.get.GetAdjacentIds;
 import uk.gov.gchq.gaffer.operation.impl.get.GetElements;
-import uk.gov.gchq.gaffer.store.StoreException;
 import uk.gov.gchq.gaffer.user.User;
 
 import java.util.ArrayList;
@@ -41,12 +40,12 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.assertj.core.api.Assertions.assertThat;
 
-public class OperationChainTest {
+class OperationChainTest {
 
     @Test
-    public void testOperationChain() throws StoreException, OperationException {
+    void testOperationChain() throws OperationException {
         // Given
         final Graph graph = new Graph.Builder()
                 .config(new GraphConfig.Builder()
@@ -61,7 +60,7 @@ public class OperationChainTest {
         graph.execute(addElements, new User());
 
         // When
-        final CloseableIterable<? extends Element> results = graph.execute(new OperationChain.Builder()
+        final Iterable<? extends Element> results = graph.execute(new OperationChain.Builder()
                 .first(new GetAdjacentIds.Builder()
                         .input(new EntitySeed("vertex1"))
                         .build())
@@ -83,7 +82,7 @@ public class OperationChainTest {
                     return edge.getSource().equals("vertex1") || edge.getDestination().equals("vertex2");
                 })
                 .forEach(expectedResults::add);
-        assertEquals(expectedResults, resultsSet);
+        assertThat(resultsSet).isEqualTo(expectedResults);
     }
 
     private static List<Element> getElements() {

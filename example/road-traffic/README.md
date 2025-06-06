@@ -33,7 +33,7 @@ cd Gaffer
 
 The rest api will be deployed to localhost:8080/rest.
 
-The sample data used is taken from the Department for Transport [GB Road Traffic Counts](http://data.dft.gov.uk/gb-traffic-matrix/Raw_count_data_major_roads.zip), which is licensed under the [Open Government Licence](http://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/).
+The sample data used is taken from the Department for Transport [GB Road Traffic Counts](https://roadtraffic.dft.gov.uk/downloads) (`https://data.dft.gov.uk/gb-traffic-matrix/Raw_count_data_major_roads.zip`), which is licensed under the [Open Government Licence](http://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/).
 
 This data contains information about UK roads, their locations and hourly traffic flow between adjacent road junctions.
 
@@ -51,4 +51,4 @@ We can start with a UK region, such as the South West, and find the locations wi
 
 There will be multiple edges representing the traffic counts between the same two junctions: one for each hour of observation recorded in the data. Each of the RoadUse edges has properties attached to it representing the start of the hour during which the traffic was counted, the end of the hour, the total vehicle count for the hour and a map of vehicle type to count for the hour.
 
-There are some in-depth examples based around the Java API here: [Getting Started](https://gchq.github.io/gaffer-doc/summaries/getting-started.html).
+There are some in-depth examples based around the Java API here: [Getting Started](https://gchq.github.io/gaffer-doc/v1docs/summaries/getting-started.html).
